@@ -22,16 +22,12 @@ class CalculateYandexMapRoute extends Component {
         // Устанавливаем начальные значения переменных
         this.state = {
             // При запуске приложения показываем диалог ввода данных расхода и стоимости топлива
-            showModal: true,
+            showModal: false,
             // Задаем первичные значения расхода и стоимости топлива исходя из передынных props
             fuelConsumption: this.props.fuelConsumptionInitialValue,
             fuelPrice: this.props.fuelPriceInitialValue,
             oldFuelConsumption: this.props.fuelConsumptionInitialValue,
             oldFuelPrice: this.props.fuelPriceInitialValue,
-
-            editMode: true,
-            departure: '',
-            destination: '',
         };
 
         // Привязываем функции обработки данных к контексту класса
@@ -39,8 +35,6 @@ class CalculateYandexMapRoute extends Component {
         this.closeSettings = this.closeSettings.bind(this);
         this.openSettings = this.openSettings.bind(this);
         this.handleSettingsChange = this.handleSettingsChange.bind(this);
-        this.handleAddressChange = this.handleAddressChange.bind(this);
-        this.swapAddresses = this.swapAddresses.bind(this);
     }
 
     // Сохраняем данные только в случае если пройдена валидация данных (если кто-то смог обойти правило в методе handleSettingsChange)
@@ -85,25 +79,6 @@ class CalculateYandexMapRoute extends Component {
         if (!isNaN(e.target.value)) {
             this.setState({[e.target.id]: e.target.value});
         }
-    }
-
-    // Изменяем state переменной
-    handleAddressChange(e) {
-        this.setState({[e.target.id]: e.target.value});
-    }
-
-    // Изменение адресов местами.
-    /*
-     * С помощью дополнительной переменной меняем адреса местами
-     * Ищем поля ввода по id и записываем в них новые значения
-     */
-    swapAddresses() {
-        let tempVar = this.state.departure;
-        this.state.departure = this.state.destination;
-        this.state.destination = tempVar;
-
-        document.getElementById('departure').value = this.state.departure;
-        document.getElementById('destination').value = this.state.destination;
     }
 
     render() {
@@ -165,64 +140,8 @@ class CalculateYandexMapRoute extends Component {
                     </div>
                 </Row>
 
-                {/* Ряд для ввода адресов и кнопок для работы с ними */}
                 <Row>
-                    <Form horizontal>
-                        {/* Оповещение пользователя о входе в режим редактирования. */}
-                        <Collapse in={this.state.editMode}>
-                            <Alert className="text-center" bsStyle="warning">
-                                <strong>Включен режим редактирования</strong>
-                            </Alert>
-                        </Collapse>
-                        {/* Меняем цвет рамки полей ввода в зависимости от того активен режим редактирвоания или нет. */}
-                        <FormGroup validationState={ this.state.editMode ? 'warning' : 'success'}>
-                            <Col componentClass={ControlLabel} sm={2}>
-                                Пункт отправления
-                            </Col>
-                            <Col sm={10}>
-                                <FormControl
-                                    id="departure"
-                                    type="text"
-                                    value={this.state.departure}
-                                    disabled={!this.state.editMode}
-                                    placeholder="Пункт отправления"
-                                    onChange={this.handleAddressChange}
-                                />
-                            </Col>
-                            <Col sm={10} smOffset={2}>
-                                <Button
-                                    bsStyle="warning"
-                                    bsSize="xsmall"
-                                    disabled={!this.state.editMode}
-                                    onClick={this.swapAddresses}>
-                                    <Glyphicon glyph="sort"/>
-                                </Button>
-                            </Col>
-                            <Col componentClass={ControlLabel} sm={2}>
-                                Пункт назначения
-                            </Col>
-                            <Col sm={10}>
-                                <FormControl
-                                    id="destination"
-                                    type="text"
-                                    value={this.state.destination}
-                                    disabled={!this.state.editMode}
-                                    placeholder="Пункт назначения"
-                                    onChange={this.handleAddressChange}
-                                />
-                            </Col>
-                        </FormGroup>
-                    </Form>
-
-                    <div id="menu" className="pull-right">
-                        <Button
-                            bsStyle="info"
-                            bsSize="xsmall"
-                            onClick={ ()=> this.setState({editMode: !this.state.editMode})}
-                        >
-                            {this.state.editMode ? 'Рассчитать маршрут' : 'Редактировать настройки' }
-                        </Button>
-                    </div>
+                    <Map />
                 </Row>
             </div>
         );
@@ -241,6 +160,251 @@ CalculateYandexMapRoute.defaultProps = {
     fuelConsumptionInitialValue: 13,
     fuelPriceInitialValue: 37.35
 };
+
+
+class Map extends Component {
+    constructor(props) {
+        super(props);
+        // Устанавливаем начальные значения переменных
+        this.state = {
+            editMode: false,
+            startPointAddress: '',
+            finishPointAddress: '',
+            startPointCoords: null,
+            finishPointCoords: null,
+        };
+
+        this.onClick = this.onClick.bind(this);
+        this.createMap = this.createMap.bind(this);
+        this.setStartPoint = this.setStartPoint.bind(this);
+        this.setFinishPoint = this.setFinishPoint.bind(this);
+        this.renderMap();
+    }
+
+    createMap() {
+        this.myMap = new ymaps.Map('map', {
+            center: [55.750475, 37.616273],
+            zoom: 9,
+            type: 'yandex#map',
+            controls: []
+        }, {
+            buttonMaxWidth: 300
+        });
+
+        this.searchStartPoint = new ymaps.control.SearchControl({
+            options: {
+                useMapBounds: true,
+                noPlacemark: true,
+                noPopup: true,
+                placeholderContent: 'Адрес начальной точки',
+                size: 'large',
+                visible: this.state.editMode
+            }
+        });
+
+        this.searchFinishPoint = new ymaps.control.SearchControl({
+            options: {
+                useMapBounds: true,
+                noCentering: true,
+                noPopup: true,
+                noPlacemark: true,
+                placeholderContent: 'Адрес конечной точки',
+                size: 'large',
+                float: 'none',
+                position: {left: 10, top: 44},
+                visible: this.state.editMode
+            }
+        });
+
+        this.buttonEditor = new ymaps.control.Button({
+            data: {content: "Режим редактирования"}
+        });
+
+        this.buildRoute();
+
+        this.buttonEditor.events.add("select", function () {
+            this.searchStartPoint.options.set('visible', true);
+            this.searchFinishPoint.options.set('visible', true);
+            this.setState({editMode: this.state.editMode = true});
+            if (this.multiRoute) {
+                this.multiRoute.editor.start({
+                    addWayPoints: false,
+                    dragWayPoints: true,
+                    addMidPoints: false,
+                });
+            }
+        }.bind(this));
+
+        this.buttonEditor.events.add("deselect", function () {
+            this.searchStartPoint.options.set('visible', false);
+            this.searchFinishPoint.options.set('visible', false);
+            this.setState({editMode: false});
+            // Выключение режима редактирования.
+            if (this.multiRoute) {
+                this.multiRoute.editor.stop();
+            }
+        }.bind(this));
+
+        this.myMap.controls.add(this.searchStartPoint);
+        this.myMap.controls.add(this.searchFinishPoint);
+        this.myMap.controls.add(this.buttonEditor);
+        this.myMap.events.add('click', this.onClick.bind());
+
+        this.searchStartPoint.events
+            .add('resultselect', function (e) {
+                let results = this.searchStartPoint.getResultsArray();
+                let selected = e.get('index');
+                let point = results[selected].geometry.getCoordinates();
+
+                this.setState({startPointCoords: point});
+
+                if (!this.buildRoute()) {
+                    this.setStartPoint(point);
+                }
+            }.bind(this))
+            .add('load', function (event) {
+                // По полю skip определяем, что это не дозагрузка данных.
+                // По getResultsCount определяем, что есть хотя бы 1 результат.
+                if (!event.get('skip') && this.searchStartPoint.getResultsCount()) {
+                    this.searchStartPoint.showResult(0);
+                }
+            }.bind(this));
+
+        this.searchFinishPoint.events
+            .add('resultselect', function (e) {
+                let results = this.searchFinishPoint.getResultsArray();
+                let selected = e.get('index');
+                let point = results[selected].geometry.getCoordinates();
+
+                this.setState({finishPointCoords: point});
+
+                if (!this.buildRoute()) {
+                    this.setFinishPoint(point);
+                }
+            }.bind(this))
+            .add('load', function (event) {
+                // По полю skip определяем, что это не дозагрузка данных.
+                // По getResultsCount определяем, что есть хотя бы 1 результат.
+                if (!event.get('skip') && this.searchFinishPoint.getResultsCount()) {
+                    this.searchFinishPoint.showResult(0);
+                }
+            }.bind(this));
+
+        this.buttonEditor.select();
+    }
+
+    buildRoute() {
+        if (this.state.startPointCoords && this.state.finishPointCoords) {
+            if (this.multiRoute) {
+                this.myMap.geoObjects.remove(this.multiRoute);
+            }
+
+            this.myMap.geoObjects.remove(this._startPoint);
+            this.myMap.geoObjects.remove(this._finishPoint);
+
+            this.multiRoute = new ymaps.multiRouter.MultiRoute({
+                referencePoints: [this.state.startPointCoords, this.state.finishPointCoords]
+            }, {
+                // Тип промежуточных точек, которые могут быть добавлены при редактировании.
+                addMidPoints: false,
+                // В режиме добавления новых путевых точек запрещаем ставить точки поверх объектов карты.
+                editorDrawOver: false
+            });
+
+            this.multiRoute.editor.start({
+                addWayPoints: false,
+                dragWayPoints: true,
+                addMidPoints: false,
+            });
+
+            this.multiRoute.editor.events.add('waypointdragend', () => {
+                let startPoint = this.multiRoute.properties.get('waypoints.0.coordinates').reverse();
+                let finishPoint = this.multiRoute.properties.get('waypoints.1.coordinates').reverse();
+                this.setState({startPointCoords: startPoint});
+                this.setState({finishPointCoords: finishPoint});
+            });
+
+            this.myMap.geoObjects.add(this.multiRoute);
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Обработчик клика по карте. Получаем координаты точки на карте и создаем маркер.
+     * @param  {Object} event Событие.
+     */
+    onClick(event) {
+        if (this.state.editMode) {
+            if (this._startPoint) {
+                this.setState({finishPointCoords: event.get('coords')});
+                this.buildRoute();
+
+                if (!this.multiRoute) {
+                    this.setFinishPoint(event.get('coords'));
+                }
+            } else {
+                this.setState({startPointCoords: event.get('coords')});
+                this.buildRoute();
+
+                if (!this.multiRoute) {
+                    this.setStartPoint(event.get('coords'));
+                }
+            }
+        }
+    }
+
+    /**
+     * Создаем начальную точку маршрута.
+     * Если точка создана, то обновляем координаты.
+     * @param {Number[]} position Координаты точки.
+     */
+    setStartPoint(position) {
+        if (this._startPoint) {
+            this._startPoint.geometry.setCoordinates(position);
+        } else {
+            // Создаем маркер с возможностью перетаскивания (опция `draggable`).
+            // По завершении перетаскивания вызываем обработчик `_onStartDragEnd`.
+            this._startPoint = new ymaps.Placemark(position, {iconContent: 'А'}, {draggable: true});
+            this._startPoint.events.add('dragend', this.onStartDragEnd, this);
+            this.myMap.geoObjects.add(this._startPoint);
+        }
+    };
+
+    /**
+     * Создаем конечную точку маршрута.
+     * Если точка создана, то обновляем координаты.
+     * @param {Number[]} position Координаты точки.
+     */
+    setFinishPoint(position) {
+        if (this._finishPoint) {
+            this._finishPoint.geometry.setCoordinates(position);
+        } else {
+            this._finishPoint = new ymaps.Placemark(position, {iconContent: 'Б'}, {draggable: true});
+            this._finishPoint.events.add('dragend', this.onFinishDragEnd, this);
+            this.myMap.geoObjects.add(this._finishPoint);
+        }
+    };
+
+    renderMap() {
+        ymaps.ready(this.createMap);
+    }
+
+    render() {
+        return (
+            <div>
+                <Collapse in={this.state.editMode}>
+                    <Alert className="text-center" bsStyle="warning">
+                        <strong>Включен режим редактирования</strong>
+                    </Alert>
+                </Collapse>
+                <div id="map" className="col-lg-12"></div>
+            </div>
+        )
+    };
+}
+
 
 // Выводим созданный класс на страницу пользователю
 ReactDOM.render(<CalculateYandexMapRoute />, document.getElementById('content'));
