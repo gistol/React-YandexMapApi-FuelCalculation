@@ -317,14 +317,23 @@ class Map extends Component {
                 addMidPoints: false,
             });
 
-            this.multiRoute.editor.events.add('waypointdragend', () => {
+            this.multiRoute.editor.events.add('waypointdragend', function () {
                 let startPoint = this.multiRoute.properties.get('waypoints.0.coordinates').reverse();
                 let finishPoint = this.multiRoute.properties.get('waypoints.1.coordinates').reverse();
+
                 this.setState({startPointCoords: startPoint});
                 this.setState({finishPointCoords: finishPoint});
-            });
+
+                ymaps.geocode(startPoint).then(function (res) {
+                    this.searchStartPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
+                }.bind(this));
+                ymaps.geocode(finishPoint).then(function (res) {
+                    this.searchFinishPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
+                }.bind(this));
+            }.bind(this));
 
             this.myMap.geoObjects.add(this.multiRoute);
+            // this.myMap.setBounds(this.myMap.geoObjects.getBounds());
             return true;
         }
 
@@ -338,14 +347,26 @@ class Map extends Component {
     onClick(event) {
         if (this.state.editMode) {
             if (this._startPoint) {
-                this.setState({finishPointCoords: event.get('coords')});
+                let coords = event.get('coords');
+                this.setState({finishPointCoords: coords});
+
+                ymaps.geocode(coords).then(function (res) {
+                    this.searchFinishPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
+                }.bind(this));
+
                 this.buildRoute();
 
                 if (!this.multiRoute) {
                     this.setFinishPoint(event.get('coords'));
                 }
             } else {
-                this.setState({startPointCoords: event.get('coords')});
+                let coords = event.get('coords');
+                this.setState({startPointCoords: coords});
+
+                ymaps.geocode(coords).then(function (res) {
+                    this.searchStartPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
+                }.bind(this));
+
                 this.buildRoute();
 
                 if (!this.multiRoute) {

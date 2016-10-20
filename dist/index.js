@@ -65,7 +65,7 @@
 /******/ 	}
 /******/ 	
 /******/ 	var hotApplyOnUpdate = true;
-/******/ 	var hotCurrentHash = "3a6b1f37a8e2371abc98"; // eslint-disable-line no-unused-vars
+/******/ 	var hotCurrentHash = "6abd916081f36a662d88"; // eslint-disable-line no-unused-vars
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentParents = []; // eslint-disable-line no-unused-vars
 /******/ 	
@@ -8789,8 +8789,6 @@
 	    }, {
 	        key: "buildRoute",
 	        value: function buildRoute() {
-	            var _this3 = this;
-
 	            if (this.state.startPointCoords && this.state.finishPointCoords) {
 	                if (this.multiRoute) {
 	                    this.myMap.geoObjects.remove(this.multiRoute);
@@ -8815,13 +8813,22 @@
 	                });
 
 	                this.multiRoute.editor.events.add('waypointdragend', function () {
-	                    var startPoint = _this3.multiRoute.properties.get('waypoints.0.coordinates').reverse();
-	                    var finishPoint = _this3.multiRoute.properties.get('waypoints.1.coordinates').reverse();
-	                    _this3.setState({ startPointCoords: startPoint });
-	                    _this3.setState({ finishPointCoords: finishPoint });
-	                });
+	                    var startPoint = this.multiRoute.properties.get('waypoints.0.coordinates').reverse();
+	                    var finishPoint = this.multiRoute.properties.get('waypoints.1.coordinates').reverse();
+
+	                    this.setState({ startPointCoords: startPoint });
+	                    this.setState({ finishPointCoords: finishPoint });
+
+	                    ymaps.geocode(startPoint).then(function (res) {
+	                        this.searchStartPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
+	                    }.bind(this));
+	                    ymaps.geocode(finishPoint).then(function (res) {
+	                        this.searchFinishPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
+	                    }.bind(this));
+	                }.bind(this));
 
 	                this.myMap.geoObjects.add(this.multiRoute);
+	                // this.myMap.setBounds(this.myMap.geoObjects.getBounds());
 	                return true;
 	            }
 
@@ -8838,14 +8845,26 @@
 	        value: function onClick(event) {
 	            if (this.state.editMode) {
 	                if (this._startPoint) {
-	                    this.setState({ finishPointCoords: event.get('coords') });
+	                    var coords = event.get('coords');
+	                    this.setState({ finishPointCoords: coords });
+
+	                    ymaps.geocode(coords).then(function (res) {
+	                        this.searchFinishPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
+	                    }.bind(this));
+
 	                    this.buildRoute();
 
 	                    if (!this.multiRoute) {
 	                        this.setFinishPoint(event.get('coords'));
 	                    }
 	                } else {
-	                    this.setState({ startPointCoords: event.get('coords') });
+	                    var _coords = event.get('coords');
+	                    this.setState({ startPointCoords: _coords });
+
+	                    ymaps.geocode(_coords).then(function (res) {
+	                        this.searchStartPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
+	                    }.bind(this));
+
 	                    this.buildRoute();
 
 	                    if (!this.multiRoute) {
