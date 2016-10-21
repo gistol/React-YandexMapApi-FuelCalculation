@@ -220,9 +220,12 @@ class Map extends Component {
             data: {content: "Режим редактирования"}
         });
 
-        this.buildRoute();
+        this.buttonSwap = new ymaps.control.Button({
+            data: {content: "Сменить адреса"}
+        });
 
         this.buttonEditor.events.add("select", function () {
+            this.buttonSwap.options.set('visible', true);
             this.searchStartPoint.options.set('visible', true);
             this.searchFinishPoint.options.set('visible', true);
             this.setState({editMode: this.state.editMode = true});
@@ -236,6 +239,7 @@ class Map extends Component {
         }.bind(this));
 
         this.buttonEditor.events.add("deselect", function () {
+            this.buttonSwap.options.set('visible', false);
             this.searchStartPoint.options.set('visible', false);
             this.searchFinishPoint.options.set('visible', false);
             this.setState({editMode: false});
@@ -245,10 +249,13 @@ class Map extends Component {
             }
         }.bind(this));
 
+        this.buttonSwap.events.add("click", () => { this.swapAddresses() });
+
         this.myMap.controls.add(this.searchStartPoint);
         this.myMap.controls.add(this.searchFinishPoint);
         this.myMap.controls.add(this.buttonEditor);
-        this.myMap.events.add('click', this.onClick.bind());
+        this.myMap.controls.add(this.buttonSwap);
+        this.myMap.events.add('click', this.onClick);
 
         this.searchStartPoint.events
             .add('resultselect', function (e) {
@@ -325,15 +332,18 @@ class Map extends Component {
                 this.setState({finishPointCoords: finishPoint});
 
                 ymaps.geocode(startPoint).then(function (res) {
+                    this.searchStartPoint.options.set('noSuggestPanel', true);
                     this.searchStartPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
+                    this.searchStartPoint.options.set('noSuggestPanel', false);
                 }.bind(this));
                 ymaps.geocode(finishPoint).then(function (res) {
+                    this.searchFinishPoint.options.set('noSuggestPanel', true);
                     this.searchFinishPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
+                    this.searchFinishPoint.options.set('noSuggestPanel', false);
                 }.bind(this));
             }.bind(this));
 
             this.myMap.geoObjects.add(this.multiRoute);
-            // this.myMap.setBounds(this.myMap.geoObjects.getBounds());
             return true;
         }
 
@@ -345,13 +355,15 @@ class Map extends Component {
      * @param  {Object} event Событие.
      */
     onClick(event) {
-        if (this.state.editMode) {
+        if (this.state.editMode && !(this.state.startPointCoords && this.state.finishPointCoords)) {
             if (this._startPoint) {
                 let coords = event.get('coords');
                 this.setState({finishPointCoords: coords});
 
                 ymaps.geocode(coords).then(function (res) {
+                    this.searchFinishPoint.options.set('noSuggestPanel', true);
                     this.searchFinishPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
+                    this.searchFinishPoint.options.set('noSuggestPanel', false);
                 }.bind(this));
 
                 this.buildRoute();
@@ -364,7 +376,9 @@ class Map extends Component {
                 this.setState({startPointCoords: coords});
 
                 ymaps.geocode(coords).then(function (res) {
+                    this.searchStartPoint.options.set('noSuggestPanel', true);
                     this.searchStartPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
+                    this.searchStartPoint.options.set('noSuggestPanel', false);
                 }.bind(this));
 
                 this.buildRoute();
@@ -388,7 +402,18 @@ class Map extends Component {
             // Создаем маркер с возможностью перетаскивания (опция `draggable`).
             // По завершении перетаскивания вызываем обработчик `_onStartDragEnd`.
             this._startPoint = new ymaps.Placemark(position, {iconContent: 'А'}, {draggable: true});
-            this._startPoint.events.add('dragend', this.onStartDragEnd, this);
+            this._startPoint.events.add('dragend', function (event) {
+                let coords = event.originalEvent.target.geometry.getCoordinates();
+                this.setState({startPointCoords: coords});
+                ymaps.geocode(coords).then(function (res) {
+                    this.searchStartPoint.options.set('noSuggestPanel', true);
+                    this.searchStartPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
+                    this.searchStartPoint.options.set('noSuggestPanel', false);
+                }.bind(this));
+            }.bind(this));
+            this._startPoint.events.add('mouseenter', function () {
+                this._startPoint.options.set('draggable', this.state.editMode);
+            }.bind(this));
             this.myMap.geoObjects.add(this._startPoint);
         }
     };
@@ -403,10 +428,44 @@ class Map extends Component {
             this._finishPoint.geometry.setCoordinates(position);
         } else {
             this._finishPoint = new ymaps.Placemark(position, {iconContent: 'Б'}, {draggable: true});
-            this._finishPoint.events.add('dragend', this.onFinishDragEnd, this);
+            this._finishPoint.events.add('dragend', function (event) {
+                let coords = event.originalEvent.target.geometry.getCoordinates();
+                this.setState({finishPointCoords: coords});
+                ymaps.geocode(coords).then(function (res) {
+                    this.searchFinishPoint.options.set('noSuggestPanel', true);
+                    this.searchFinishPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
+                    this.searchFinishPoint.options.set('noSuggestPanel', false);
+                }.bind(this));
+            }.bind(this));
+            this._finishPoint.events.add('mouseenter', function () {
+                this._finishPoint.options.set('draggable', this.state.editMode);
+            }.bind(this));
             this.myMap.geoObjects.add(this._finishPoint);
         }
     };
+
+    swapAddresses() {
+        if(this.state.startPointCoords && this.state.finishPointCoords) {
+            let tempAddress = this.state.startPointCoords;
+            this.setState({startPointCoords: this.state.finishPointCoords});
+            this.setState({finishPointCoords: tempAddress});
+
+            ymaps.geocode(this.state.startPointCoords).then(function (res) {
+                this.searchStartPoint.options.set('noSuggestPanel', true);
+                this.searchStartPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
+                this.searchStartPoint.options.set('noSuggestPanel', false);
+            }.bind(this));
+            ymaps.geocode(this.state.finishPointCoords).then(function (res) {
+                this.searchFinishPoint.options.set('noSuggestPanel', true);
+                this.searchFinishPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
+                this.searchFinishPoint.options.set('noSuggestPanel', false);
+            }.bind(this));
+
+            this.buildRoute();
+        }
+
+        this.buttonSwap.select();
+    }
 
     renderMap() {
         ymaps.ready(this.createMap);
