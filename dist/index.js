@@ -65,7 +65,7 @@
 /******/ 	}
 /******/ 	
 /******/ 	var hotApplyOnUpdate = true;
-/******/ 	var hotCurrentHash = "a851babc4f588e59923f"; // eslint-disable-line no-unused-vars
+/******/ 	var hotCurrentHash = "81df6f5e1d79a7cd9681"; // eslint-disable-line no-unused-vars
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentParents = []; // eslint-disable-line no-unused-vars
 /******/ 	
@@ -8435,14 +8435,14 @@
 
 
 	// Класс для обработки данных и вывода информации на страницу
-	var CalculateYandexMapRoute = function (_Component) {
-	    _inherits(CalculateYandexMapRoute, _Component);
+	var Map = function (_Component) {
+	    _inherits(Map, _Component);
 
-	    function CalculateYandexMapRoute(props) {
-	        _classCallCheck(this, CalculateYandexMapRoute);
+	    function Map(props) {
+	        _classCallCheck(this, Map);
 
 	        // Устанавливаем начальные значения переменных
-	        var _this = _possibleConstructorReturn(this, (CalculateYandexMapRoute.__proto__ || Object.getPrototypeOf(CalculateYandexMapRoute)).call(this, props));
+	        var _this = _possibleConstructorReturn(this, (Map.__proto__ || Object.getPrototypeOf(Map)).call(this, props));
 
 	        _this.state = {
 	            // При запуске приложения показываем диалог ввода данных расхода и стоимости топлива
@@ -8451,7 +8451,18 @@
 	            fuelConsumption: _this.props.fuelConsumptionInitialValue,
 	            fuelPrice: _this.props.fuelPriceInitialValue,
 	            oldFuelConsumption: _this.props.fuelConsumptionInitialValue,
-	            oldFuelPrice: _this.props.fuelPriceInitialValue
+	            oldFuelPrice: _this.props.fuelPriceInitialValue,
+
+	            // Переменная для обозначения активности режима редактирования маршурта
+	            editMode: false,
+
+	            // Координаты точек на карте для обозначения адресов до того как маршрут построен
+	            startPoint: null,
+	            finishPoint: null,
+
+	            // Координаты маршрута
+	            startPointCoords: null,
+	            finishPointCoords: null
 	        };
 
 	        // Привязываем функции обработки данных к контексту класса
@@ -8459,13 +8470,27 @@
 	        _this.closeSettings = _this.closeSettings.bind(_this);
 	        _this.openSettings = _this.openSettings.bind(_this);
 	        _this.handleSettingsChange = _this.handleSettingsChange.bind(_this);
+
+	        _this.onClick = _this.onClick.bind(_this);
+	        _this.createMap = _this.createMap.bind(_this);
+	        _this.setStartPoint = _this.setStartPoint.bind(_this);
+	        _this.setFinishPoint = _this.setFinishPoint.bind(_this);
+	        _this.drawMap();
 	        return _this;
 	    }
 
-	    // Сохраняем данные только в случае если пройдена валидация данных (если кто-то смог обойти правило в методе handleSettingsChange)
+	    /**
+	     * ==================================================
+	     * ===== Рендер и функционал окна с настройками =====
+	     * ==================================================
+	     */
+
+	    /**
+	     * Сохраняем данные только в случае если пройдена валидация данных (если кто-то смог обойти правило в методе handleSettingsChange)
+	     */
 
 
-	    _createClass(CalculateYandexMapRoute, [{
+	    _createClass(Map, [{
 	        key: "saveSettings",
 	        value: function saveSettings() {
 	            if (this.fuelConsumptionValidation() == 'success' && this.fuelPriceValidation() == 'success') {
@@ -8473,7 +8498,9 @@
 	            }
 	        }
 
-	        // Отмена изменений в меню настроек расхода и стоимости топлива
+	        /**
+	         * Отмена изменений в меню настроек расхода и стоимости топлива
+	         */
 
 	    }, {
 	        key: "closeSettings",
@@ -8483,7 +8510,9 @@
 	            this.setState({ showModal: false });
 	        }
 
-	        // При открытии меню настроек запоминвем старые значения для возможности отката в случае нажатия кнопки отмены
+	        /**
+	         * При открытии меню настроек запоминвем старые значения для возможности отката в случае нажатия кнопки отмены
+	         */
 
 	    }, {
 	        key: "openSettings",
@@ -8493,7 +8522,9 @@
 	            this.setState({ showModal: true });
 	        }
 
-	        // Валидация. Потребление топлива должно быть числом
+	        /**
+	         * Валидация. Потребление топлива должно быть числом
+	         */
 
 	    }, {
 	        key: "fuelConsumptionValidation",
@@ -8504,7 +8535,9 @@
 	            return 'success';
 	        }
 
-	        // Валидация. Цена должна быть числом
+	        /**
+	         * Валидация. Цена должна быть числом
+	         */
 
 	    }, {
 	        key: "fuelPriceValidation",
@@ -8515,7 +8548,9 @@
 	            return 'success';
 	        }
 
-	        // При вводе данных разрешаем использовать только числа и изменяем state переменной
+	        /**
+	         * При вводе данных разрешаем использовать только числа и изменяем state переменной
+	         */
 
 	    }, {
 	        key: "handleSettingsChange",
@@ -8524,164 +8559,123 @@
 	                this.setState(_defineProperty({}, e.target.id, e.target.value));
 	            }
 	        }
+
+	        /**
+	         * Рендер кнопки вызова настроек и формы ля заполнения
+	         */
+
 	    }, {
-	        key: "render",
-	        value: function render() {
+	        key: "renderSettings",
+	        value: function renderSettings() {
 	            return _react2.default.createElement(
 	                "div",
-	                { className: "main" },
+	                { className: "modal-container" },
 	                _react2.default.createElement(
-	                    _reactBootstrap.Row,
-	                    null,
+	                    "div",
+	                    { id: "menu", className: "pull-right" },
 	                    _react2.default.createElement(
-	                        "div",
-	                        { className: "modal-container" },
+	                        _reactBootstrap.Button,
+	                        { bsStyle: "primary", onClick: this.openSettings },
+	                        _react2.default.createElement(_reactBootstrap.Glyphicon, { glyph: "cog" })
+	                    )
+	                ),
+	                _react2.default.createElement(
+	                    _reactBootstrap.Modal,
+	                    { show: this.state.showModal, onHide: this.closeSettings },
+	                    _react2.default.createElement(
+	                        _reactBootstrap.Modal.Header,
+	                        { closeButton: true },
 	                        _react2.default.createElement(
-	                            "div",
-	                            { id: "menu", className: "pull-right" },
-	                            _react2.default.createElement(
-	                                _reactBootstrap.Button,
-	                                { bsStyle: "primary", onClick: this.openSettings },
-	                                _react2.default.createElement(_reactBootstrap.Glyphicon, { glyph: "cog" })
-	                            )
-	                        ),
+	                            _reactBootstrap.Modal.Title,
+	                            null,
+	                            "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0440\u0430\u0441\u0445\u043E\u0434\u0430 \u0438 \u0441\u0442\u043E\u0438\u043C\u043E\u0441\u0442\u0438 \u0442\u043E\u043F\u043B\u0438\u0432\u0430"
+	                        )
+	                    ),
+	                    _react2.default.createElement(
+	                        _reactBootstrap.Modal.Body,
+	                        null,
 	                        _react2.default.createElement(
-	                            _reactBootstrap.Modal,
-	                            { show: this.state.showModal, onHide: this.closeSettings },
+	                            "form",
+	                            null,
 	                            _react2.default.createElement(
-	                                _reactBootstrap.Modal.Header,
-	                                { closeButton: true },
+	                                _reactBootstrap.FormGroup,
+	                                {
+	                                    controlId: "fuelConsumption",
+	                                    validationState: this.fuelConsumptionValidation(this)
+	                                },
 	                                _react2.default.createElement(
-	                                    _reactBootstrap.Modal.Title,
+	                                    _reactBootstrap.ControlLabel,
 	                                    null,
-	                                    "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0440\u0430\u0441\u0445\u043E\u0434\u0430 \u0438 \u0441\u0442\u043E\u0438\u043C\u043E\u0441\u0442\u0438 \u0442\u043E\u043F\u043B\u0438\u0432\u0430"
-	                                )
-	                            ),
-	                            _react2.default.createElement(
-	                                _reactBootstrap.Modal.Body,
-	                                null,
-	                                _react2.default.createElement(
-	                                    "form",
-	                                    null,
-	                                    _react2.default.createElement(
-	                                        _reactBootstrap.FormGroup,
-	                                        {
-	                                            controlId: "fuelConsumption",
-	                                            validationState: this.fuelConsumptionValidation(this)
-	                                        },
-	                                        _react2.default.createElement(
-	                                            _reactBootstrap.ControlLabel,
-	                                            null,
-	                                            "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043F\u043E\u0442\u0440\u0435\u0431\u043B\u0435\u043D\u0438\u0435 \u0442\u043E\u043F\u043B\u0438\u0432\u0430 \u043D\u0430 100 \u043A\u043C."
-	                                        ),
-	                                        _react2.default.createElement(_reactBootstrap.FormControl, {
-	                                            type: "text",
-	                                            value: this.state.fuelConsumption,
-	                                            placeholder: "\u0417\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \u0434\u043E\u043B\u0436\u043D\u043E \u0431\u044B\u0442\u044C \u0447\u0438\u0441\u043B\u043E\u043C",
-	                                            onChange: this.handleSettingsChange
-	                                        }),
-	                                        _react2.default.createElement(_reactBootstrap.FormControl.Feedback, null)
-	                                    ),
-	                                    _react2.default.createElement(
-	                                        _reactBootstrap.FormGroup,
-	                                        {
-	                                            controlId: "fuelPrice",
-	                                            validationState: this.fuelPriceValidation(this)
-	                                        },
-	                                        _react2.default.createElement(
-	                                            _reactBootstrap.ControlLabel,
-	                                            null,
-	                                            "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0442\u043E\u0438\u043C\u043E\u0441\u0442\u044C \u0442\u043E\u043F\u043B\u0438\u0432\u0430."
-	                                        ),
-	                                        _react2.default.createElement(_reactBootstrap.FormControl, {
-	                                            type: "text",
-	                                            value: this.state.fuelPrice,
-	                                            placeholder: "\u0417\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \u0434\u043E\u043B\u0436\u043D\u043E \u0431\u044B\u0442\u044C \u0447\u0438\u0441\u043B\u043E\u043C",
-	                                            onChange: this.handleSettingsChange
-	                                        }),
-	                                        _react2.default.createElement(_reactBootstrap.FormControl.Feedback, null)
-	                                    )
-	                                )
-	                            ),
-	                            _react2.default.createElement(
-	                                _reactBootstrap.Modal.Footer,
-	                                null,
-	                                _react2.default.createElement(
-	                                    _reactBootstrap.Button,
-	                                    { onClick: this.saveSettings, bsStyle: "success" },
-	                                    "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C"
+	                                    "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043F\u043E\u0442\u0440\u0435\u0431\u043B\u0435\u043D\u0438\u0435 \u0442\u043E\u043F\u043B\u0438\u0432\u0430 \u043D\u0430 100 \u043A\u043C."
 	                                ),
+	                                _react2.default.createElement(_reactBootstrap.FormControl, {
+	                                    type: "text",
+	                                    value: this.state.fuelConsumption,
+	                                    placeholder: "\u0417\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \u0434\u043E\u043B\u0436\u043D\u043E \u0431\u044B\u0442\u044C \u0447\u0438\u0441\u043B\u043E\u043C",
+	                                    onChange: this.handleSettingsChange
+	                                }),
+	                                _react2.default.createElement(_reactBootstrap.FormControl.Feedback, null)
+	                            ),
+	                            _react2.default.createElement(
+	                                _reactBootstrap.FormGroup,
+	                                {
+	                                    controlId: "fuelPrice",
+	                                    validationState: this.fuelPriceValidation(this)
+	                                },
 	                                _react2.default.createElement(
-	                                    _reactBootstrap.Button,
-	                                    { onClick: this.closeSettings, bsStyle: "danger" },
-	                                    "\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C"
-	                                )
+	                                    _reactBootstrap.ControlLabel,
+	                                    null,
+	                                    "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0442\u043E\u0438\u043C\u043E\u0441\u0442\u044C \u0442\u043E\u043F\u043B\u0438\u0432\u0430."
+	                                ),
+	                                _react2.default.createElement(_reactBootstrap.FormControl, {
+	                                    type: "text",
+	                                    value: this.state.fuelPrice,
+	                                    placeholder: "\u0417\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \u0434\u043E\u043B\u0436\u043D\u043E \u0431\u044B\u0442\u044C \u0447\u0438\u0441\u043B\u043E\u043C",
+	                                    onChange: this.handleSettingsChange
+	                                }),
+	                                _react2.default.createElement(_reactBootstrap.FormControl.Feedback, null)
 	                            )
+	                        )
+	                    ),
+	                    _react2.default.createElement(
+	                        _reactBootstrap.Modal.Footer,
+	                        null,
+	                        _react2.default.createElement(
+	                            _reactBootstrap.Button,
+	                            { onClick: this.saveSettings, bsStyle: "success" },
+	                            "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C"
 	                        ),
 	                        _react2.default.createElement(
-	                            "div",
-	                            { className: "col-lg-12" },
-	                            _react2.default.createElement("hr", null)
+	                            _reactBootstrap.Button,
+	                            { onClick: this.closeSettings, bsStyle: "danger" },
+	                            "\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C"
 	                        )
 	                    )
 	                ),
 	                _react2.default.createElement(
-	                    _reactBootstrap.Row,
-	                    null,
-	                    _react2.default.createElement(Map, null)
+	                    "div",
+	                    { className: "col-lg-12" },
+	                    _react2.default.createElement("hr", null)
 	                )
 	            );
 	        }
-	    }]);
 
-	    return CalculateYandexMapRoute;
-	}(_react.Component);
+	        /**
+	         * ===========================================
+	         * ===== Рендер и работа с картой Yandex =====
+	         * ===========================================
+	         * */
 
-	// Указываем что значения расхода и стоимости топлива должжны быть числами и что они обязательны для ввода
-	// При неправильном типе данных переменных или их отсутствии в консоль браузера будут выведены ошибки
+	        /**
+	         * Функция создания карты и добавления в нее элементов управления
+	         */
 
-
-	CalculateYandexMapRoute.propTypes = {
-	    fuelConsumptionInitialValue: _react2.default.PropTypes.number.isRequired,
-	    fuelPriceInitialValue: _react2.default.PropTypes.number.isRequired
-	};
-
-	// Задаем значения по умолчанию
-	CalculateYandexMapRoute.defaultProps = {
-	    fuelConsumptionInitialValue: 13,
-	    fuelPriceInitialValue: 37.35
-	};
-
-	var Map = function (_Component2) {
-	    _inherits(Map, _Component2);
-
-	    function Map(props) {
-	        _classCallCheck(this, Map);
-
-	        // Устанавливаем начальные значения переменных
-	        var _this2 = _possibleConstructorReturn(this, (Map.__proto__ || Object.getPrototypeOf(Map)).call(this, props));
-
-	        _this2.state = {
-	            editMode: false,
-	            startPointAddress: '',
-	            finishPointAddress: '',
-	            startPointCoords: null,
-	            finishPointCoords: null
-	        };
-
-	        _this2.onClick = _this2.onClick.bind(_this2);
-	        _this2.createMap = _this2.createMap.bind(_this2);
-	        _this2.setStartPoint = _this2.setStartPoint.bind(_this2);
-	        _this2.setFinishPoint = _this2.setFinishPoint.bind(_this2);
-	        _this2.renderMap();
-	        return _this2;
-	    }
-
-	    _createClass(Map, [{
+	    }, {
 	        key: "createMap",
 	        value: function createMap() {
-	            var _this3 = this;
+	            var _this2 = this;
 
+	            // Создание карты с заданным центром и приближением
 	            this.myMap = new ymaps.Map('map', {
 	                center: [55.750475, 37.616273],
 	                zoom: 9,
@@ -8691,6 +8685,7 @@
 	                buttonMaxWidth: 300
 	            });
 
+	            // Поисковое поле для начала маршрута
 	            this.searchStartPoint = new ymaps.control.SearchControl({
 	                options: {
 	                    useMapBounds: true,
@@ -8702,6 +8697,7 @@
 	                }
 	            });
 
+	            // Поисковое поле для конечной точки маршрута
 	            this.searchFinishPoint = new ymaps.control.SearchControl({
 	                options: {
 	                    useMapBounds: true,
@@ -8716,19 +8712,23 @@
 	                }
 	            });
 
+	            // Кнопка включения и отключения режима редактирования
 	            this.buttonEditor = new ymaps.control.Button({
 	                data: { content: "Режим редактирования" }
 	            });
 
+	            // Кнопка смены мест адресов
 	            this.buttonSwap = new ymaps.control.Button({
 	                data: { content: "Сменить адреса" }
 	            });
 
+	            // При входе в режим редактирования, делаем видимыми поля поиска и кнопку смена адресов
+	            // И присваиваем переменной editMode значение true, что в свою очередь отображает предупреждение о входе в режим
 	            this.buttonEditor.events.add("select", function () {
 	                this.buttonSwap.options.set('visible', true);
 	                this.searchStartPoint.options.set('visible', true);
 	                this.searchFinishPoint.options.set('visible', true);
-	                this.setState({ editMode: this.state.editMode = true });
+	                this.setState({ editMode: true });
 	                if (this.multiRoute) {
 	                    this.multiRoute.editor.start({
 	                        addWayPoints: false,
@@ -8738,6 +8738,7 @@
 	                }
 	            }.bind(this));
 
+	            // При выходе из режима редактирования прячем элементы редактирования маршрута и скрываем предупреждение
 	            this.buttonEditor.events.add("deselect", function () {
 	                this.buttonSwap.options.set('visible', false);
 	                this.searchStartPoint.options.set('visible', false);
@@ -8749,15 +8750,30 @@
 	                }
 	            }.bind(this));
 
+	            // Событие нажатия кнопки смена адресов
 	            this.buttonSwap.events.add("click", function () {
-	                _this3.swapAddresses();
+	                _this2.swapAddresses();
 	            });
 
+	            // Добавляем на карту элементы управления
 	            this.myMap.controls.add(this.searchStartPoint);
 	            this.myMap.controls.add(this.searchFinishPoint);
 	            this.myMap.controls.add(this.buttonEditor);
 	            this.myMap.controls.add(this.buttonSwap);
 	            this.myMap.events.add('click', this.onClick);
+
+	            /**
+	             * Добавляем обработу событий для поисковых полей
+	             *
+	             * Событие "resultselect":
+	             * При выборе какого-либо варианта из поиска получаем координаты точки
+	             * и записываем их в переменную startPointCoords или searchFinishPoint.
+	             * Если маршрут еще не построен, ставим отметку на карте для наглядности при составлении маршрута
+	             *
+	             * Событие "load":
+	             * По полю skip определяем, что это не дозагрузка данных.
+	             * По getResultsCount определяем, что есть хотя бы 1 результат.
+	             */
 
 	            this.searchStartPoint.events.add('resultselect', function (e) {
 	                var results = this.searchStartPoint.getResultsArray();
@@ -8770,8 +8786,6 @@
 	                    this.setStartPoint(point);
 	                }
 	            }.bind(this)).add('load', function (event) {
-	                // По полю skip определяем, что это не дозагрузка данных.
-	                // По getResultsCount определяем, что есть хотя бы 1 результат.
 	                if (!event.get('skip') && this.searchStartPoint.getResultsCount()) {
 	                    this.searchStartPoint.showResult(0);
 	                }
@@ -8788,8 +8802,6 @@
 	                    this.setFinishPoint(point);
 	                }
 	            }.bind(this)).add('load', function (event) {
-	                // По полю skip определяем, что это не дозагрузка данных.
-	                // По getResultsCount определяем, что есть хотя бы 1 результат.
 	                if (!event.get('skip') && this.searchFinishPoint.getResultsCount()) {
 	                    this.searchFinishPoint.showResult(0);
 	                }
@@ -8797,39 +8809,56 @@
 
 	            this.buttonEditor.select();
 	        }
+
+	        /**
+	         * Построение маршрута
+	         */
+
 	    }, {
 	        key: "buildRoute",
 	        value: function buildRoute() {
+	            // Если маршрут уже есть, удаляем его
 	            if (this.state.startPointCoords && this.state.finishPointCoords) {
 	                if (this.multiRoute) {
 	                    this.myMap.geoObjects.remove(this.multiRoute);
 	                }
 
-	                this.myMap.geoObjects.remove(this._startPoint);
-	                this.myMap.geoObjects.remove(this._finishPoint);
+	                // Удаляем отметки от searchStartPoint и searchFinishPoint,
+	                // т.к. при составлении маршрута нужные точки появтся сами от multiRouter
+	                this.myMap.geoObjects.remove(this.state.startPoint);
+	                this.myMap.geoObjects.remove(this.state.finishPoint);
 
+	                // Строим маршрут на основании полученных ранее координат
+	                // Запрещаем использовать транзитные точки
+	                // В режиме добавления новых путевых точек запрещаем ставить точки поверх объектов карты.
 	                this.multiRoute = new ymaps.multiRouter.MultiRoute({
 	                    referencePoints: [this.state.startPointCoords, this.state.finishPointCoords]
 	                }, {
-	                    // Тип промежуточных точек, которые могут быть добавлены при редактировании.
 	                    addMidPoints: false,
-	                    // В режиме добавления новых путевых точек запрещаем ставить точки поверх объектов карты.
 	                    editorDrawOver: false
 	                });
 
+	                // После создания маршрута сразу включаем режим его редактирования
+	                // Разрешено только перетаскивание существующих точек
 	                this.multiRoute.editor.start({
 	                    addWayPoints: false,
 	                    dragWayPoints: true,
 	                    addMidPoints: false
 	                });
 
+	                // Обработка события окончания перетаскивания путевых точек
 	                this.multiRoute.editor.events.add('waypointdragend', function () {
+	                    // Получаем новые координаты точек
+	                    // и записываем их в координаты для построения маршрута
 	                    var startPoint = this.multiRoute.properties.get('waypoints.0.coordinates').reverse();
 	                    var finishPoint = this.multiRoute.properties.get('waypoints.1.coordinates').reverse();
 
 	                    this.setState({ startPointCoords: startPoint });
 	                    this.setState({ finishPointCoords: finishPoint });
 
+	                    // Записываем в поля поиска новые адреса точен
+	                    // Приходится использовать опцию 'noSuggestPanel' чтобы избежать постоянного появления всплывающих окон
+	                    // с результатами поиска по введенному адресу
 	                    ymaps.geocode(startPoint).then(function (res) {
 	                        this.searchStartPoint.options.set('noSuggestPanel', true);
 	                        this.searchStartPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
@@ -8842,34 +8871,40 @@
 	                    }.bind(this));
 	                }.bind(this));
 
+	                // Добавляем на карту новый маршрут
 	                this.myMap.geoObjects.add(this.multiRoute);
 	                return true;
 	            }
-
 	            return false;
 	        }
 
 	        /**
 	         * Обработчик клика по карте. Получаем координаты точки на карте и создаем маркер.
-	         * @param  {Object} event Событие.
 	         */
 
 	    }, {
 	        key: "onClick",
 	        value: function onClick(event) {
+	            // Клик по карте обрабатываем только в случае активного режима редактирования
+	            // и пока не созданы обе точки для маршрута
+	            // как в самом Yandex - при созданном маршруте дополнительные путевые точки не создаются
 	            if (this.state.editMode && !(this.state.startPointCoords && this.state.finishPointCoords)) {
-	                if (this._startPoint) {
+	                // Если точка старта уже присутствует, то создаем конечную точку
+	                if (this.state.startPoint) {
 	                    var coords = event.get('coords');
 	                    this.setState({ finishPointCoords: coords });
 
+	                    // Записываем адрес в поисковую строку
 	                    ymaps.geocode(coords).then(function (res) {
 	                        this.searchFinishPoint.options.set('noSuggestPanel', true);
 	                        this.searchFinishPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
 	                        this.searchFinishPoint.options.set('noSuggestPanel', false);
 	                    }.bind(this));
 
+	                    // Создаем маршрут
 	                    this.buildRoute();
 
+	                    // Если маршрут еще не создан, ставим маркер на карту для обозначения местонахождения адреса
 	                    if (!this.multiRoute) {
 	                        this.setFinishPoint(event.get('coords'));
 	                    }
@@ -8877,14 +8912,17 @@
 	                    var _coords = event.get('coords');
 	                    this.setState({ startPointCoords: _coords });
 
+	                    // Записываем адрес в поисковую строку
 	                    ymaps.geocode(_coords).then(function (res) {
 	                        this.searchStartPoint.options.set('noSuggestPanel', true);
 	                        this.searchStartPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
 	                        this.searchStartPoint.options.set('noSuggestPanel', false);
 	                    }.bind(this));
 
+	                    // Создаем маршрут
 	                    this.buildRoute();
 
+	                    // Если маршрут еще не создан, ставим маркер на карту для обозначения местонахождения адреса
 	                    if (!this.multiRoute) {
 	                        this.setStartPoint(event.get('coords'));
 	                    }
@@ -8895,19 +8933,18 @@
 	        /**
 	         * Создаем начальную точку маршрута.
 	         * Если точка создана, то обновляем координаты.
-	         * @param {Number[]} position Координаты точки.
 	         */
 
 	    }, {
 	        key: "setStartPoint",
 	        value: function setStartPoint(position) {
-	            if (this._startPoint) {
-	                this._startPoint.geometry.setCoordinates(position);
+	            if (this.state.startPoint) {
+	                this.state.startPoint.geometry.setCoordinates(position);
 	            } else {
 	                // Создаем маркер с возможностью перетаскивания (опция `draggable`).
-	                // По завершении перетаскивания вызываем обработчик `_onStartDragEnd`.
-	                this._startPoint = new ymaps.Placemark(position, { iconContent: 'А' }, { draggable: true });
-	                this._startPoint.events.add('dragend', function (event) {
+	                // По завершении перетаскивания обновляем координаты для маршрута и записываем новый адрес в поле поиска
+	                this.setState({ startPoint: new ymaps.Placemark(position, { iconContent: 'А' }, { draggable: true }) });
+	                this.state.startPoint.events.add('dragend', function (event) {
 	                    var coords = event.originalEvent.target.geometry.getCoordinates();
 	                    this.setState({ startPointCoords: coords });
 	                    ymaps.geocode(coords).then(function (res) {
@@ -8916,10 +8953,13 @@
 	                        this.searchStartPoint.options.set('noSuggestPanel', false);
 	                    }.bind(this));
 	                }.bind(this));
-	                this._startPoint.events.add('mouseenter', function () {
-	                    this._startPoint.options.set('draggable', this.state.editMode);
+	                // Функция обработки наведения мыши на маркер
+	                // С помощью нее определяем включен режим редактирования или нет
+	                // и исходя из этого разрешаем или запрещаем перетаскивание маркера
+	                this.state.startPoint.events.add('mouseenter', function () {
+	                    this.state.startPoint.options.set('draggable', this.state.editMode);
 	                }.bind(this));
-	                this.myMap.geoObjects.add(this._startPoint);
+	                this.myMap.geoObjects.add(this.state.startPoint);
 	            }
 	        }
 	    }, {
@@ -8929,14 +8969,15 @@
 	        /**
 	         * Создаем конечную точку маршрута.
 	         * Если точка создана, то обновляем координаты.
-	         * @param {Number[]} position Координаты точки.
 	         */
 	        value: function setFinishPoint(position) {
-	            if (this._finishPoint) {
-	                this._finishPoint.geometry.setCoordinates(position);
+	            if (this.state.finishPoint) {
+	                this.state.finishPoint.geometry.setCoordinates(position);
 	            } else {
-	                this._finishPoint = new ymaps.Placemark(position, { iconContent: 'Б' }, { draggable: true });
-	                this._finishPoint.events.add('dragend', function (event) {
+	                // Создаем маркер с возможностью перетаскивания (опция `draggable`).
+	                // По завершении перетаскивания обновляем координаты для маршрута и записываем новый адрес в поле поиска
+	                this.setState({ finishPoint: new ymaps.Placemark(position, { iconContent: 'Б' }, { draggable: true }) });
+	                this.state.finishPoint.events.add('dragend', function (event) {
 	                    var coords = event.originalEvent.target.geometry.getCoordinates();
 	                    this.setState({ finishPointCoords: coords });
 	                    ymaps.geocode(coords).then(function (res) {
@@ -8945,14 +8986,23 @@
 	                        this.searchFinishPoint.options.set('noSuggestPanel', false);
 	                    }.bind(this));
 	                }.bind(this));
-	                this._finishPoint.events.add('mouseenter', function () {
-	                    this._finishPoint.options.set('draggable', this.state.editMode);
+	                // Функция обработки наведения мыши на маркер
+	                // С помощью нее определяем включен режим редактирования или нет
+	                // и исходя из этого разрешаем или запрещаем перетаскивание маркера
+	                this.state.finishPoint.events.add('mouseenter', function () {
+	                    this.state.finishPoint.options.set('draggable', this.state.editMode);
 	                }.bind(this));
-	                this.myMap.geoObjects.add(this._finishPoint);
+	                this.myMap.geoObjects.add(this.state.finishPoint);
 	            }
 	        }
 	    }, {
 	        key: "swapAddresses",
+
+
+	        /**
+	         * Функция смена адресов
+	         * Меняем местами координаты маршрута и адреса точек
+	         */
 	        value: function swapAddresses() {
 	            if (this.state.startPointCoords && this.state.finishPointCoords) {
 	                var tempAddress = this.state.startPointCoords;
@@ -8975,14 +9025,24 @@
 
 	            this.buttonSwap.select();
 	        }
+
+	        /**
+	         * Функия определения готовности API Yandex и вызов функции создания карты
+	         */
+
+	    }, {
+	        key: "drawMap",
+	        value: function drawMap() {
+	            ymaps.ready(this.createMap);
+	        }
+
+	        /**
+	         * Отрисовка карты и оповещения о входе в режим редактирования
+	         */
+
 	    }, {
 	        key: "renderMap",
 	        value: function renderMap() {
-	            ymaps.ready(this.createMap);
-	        }
-	    }, {
-	        key: "render",
-	        value: function render() {
 	            return _react2.default.createElement(
 	                "div",
 	                null,
@@ -9002,15 +9062,57 @@
 	                _react2.default.createElement("div", { id: "map", className: "col-lg-12" })
 	            );
 	        }
+
+	        /**
+	         * Отрисовка всего модуля
+	         */
+
+	    }, {
+	        key: "render",
+	        value: function render() {
+	            return _react2.default.createElement(
+	                "div",
+	                { className: "main" },
+	                _react2.default.createElement(
+	                    _reactBootstrap.Row,
+	                    null,
+	                    this.renderSettings()
+	                ),
+	                _react2.default.createElement(
+	                    _reactBootstrap.Row,
+	                    null,
+	                    this.renderMap()
+	                )
+	            );
+	        }
 	    }]);
 
 	    return Map;
 	}(_react.Component);
 
-	// Выводим созданный класс на страницу пользователю
+	/**
+	 * Указываем что значения расхода и стоимости топлива должжны быть числами и что они обязательны для ввода
+	 * При неправильном типе данных переменных или их отсутствии в консоль браузера будут
+	 */
 
 
-	_reactDom2.default.render(_react2.default.createElement(CalculateYandexMapRoute, null), document.getElementById('content'));
+	Map.propTypes = {
+	    fuelConsumptionInitialValue: _react2.default.PropTypes.number.isRequired,
+	    fuelPriceInitialValue: _react2.default.PropTypes.number.isRequired
+	};
+
+	/**
+	 * Задаем значения по умолчанию
+	 */
+	Map.defaultProps = {
+	    fuelConsumptionInitialValue: 13,
+	    fuelPriceInitialValue: 37.35
+	};
+
+	/**
+	 * Выводим созданный класс на страницу пользователю
+	 */
+	_reactDom2.default.render(_react2.default.createElement(Map, null), document.getElementById('content'));
 
 	/* REACT HOT LOADER */ }).call(this); } finally { if (true) { (function () { var foundReactClasses = module.hot.data && module.hot.data.foundReactClasses || false; if (module.exports && module.makeHot) { var makeExportsHot = __webpack_require__(510); if (makeExportsHot(module, __webpack_require__(156))) { foundReactClasses = true; } var shouldAcceptModule = true && foundReactClasses; if (shouldAcceptModule) { module.hot.accept(function (err) { if (err) { console.error("Cannot not apply hot update to " + "YandexMap.js" + ": " + err.message); } }); } } module.hot.dispose(function (data) { data.makeHot = module.makeHot; data.foundReactClasses = foundReactClasses; }); })(); } }
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(4)(module)))
