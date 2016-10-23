@@ -65,7 +65,7 @@
 /******/ 	}
 /******/ 	
 /******/ 	var hotApplyOnUpdate = true;
-/******/ 	var hotCurrentHash = "81df6f5e1d79a7cd9681"; // eslint-disable-line no-unused-vars
+/******/ 	var hotCurrentHash = "855d5411c0ca14a78021"; // eslint-disable-line no-unused-vars
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentParents = []; // eslint-disable-line no-unused-vars
 /******/ 	
@@ -8495,6 +8495,11 @@
 	        value: function saveSettings() {
 	            if (this.fuelConsumptionValidation() == 'success' && this.fuelPriceValidation() == 'success') {
 	                this.setState({ showModal: false });
+
+	                if (this.multiRoute) {
+	                    var routeLength = this.multiRoute.getActiveRoute().properties.get('distance').value / 1000;
+	                    this.addRouteInfo(routeLength);
+	                }
 	            }
 	        }
 
@@ -8611,7 +8616,7 @@
 	                                _react2.default.createElement(_reactBootstrap.FormControl, {
 	                                    type: "text",
 	                                    value: this.state.fuelConsumption,
-	                                    placeholder: "\u0417\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \u0434\u043E\u043B\u0436\u043D\u043E \u0431\u044B\u0442\u044C \u0447\u0438\u0441\u043B\u043E\u043C",
+	                                    placeholder: "\u0417\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \u0434\u043E\u043B\u0436\u043D\u043E \u0431\u044B\u0442\u044C \u043F\u043E\u043B\u043E\u0436\u0438\u0442\u0435\u043B\u044C\u043D\u044B\u043C \u0447\u0438\u0441\u043B\u043E\u043C",
 	                                    onChange: this.handleSettingsChange
 	                                }),
 	                                _react2.default.createElement(_reactBootstrap.FormControl.Feedback, null)
@@ -8625,12 +8630,12 @@
 	                                _react2.default.createElement(
 	                                    _reactBootstrap.ControlLabel,
 	                                    null,
-	                                    "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0442\u043E\u0438\u043C\u043E\u0441\u0442\u044C \u0442\u043E\u043F\u043B\u0438\u0432\u0430."
+	                                    "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0441\u0442\u043E\u0438\u043C\u043E\u0441\u0442\u044C \u0442\u043E\u043F\u043B\u0438\u0432\u0430."
 	                                ),
 	                                _react2.default.createElement(_reactBootstrap.FormControl, {
 	                                    type: "text",
 	                                    value: this.state.fuelPrice,
-	                                    placeholder: "\u0417\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \u0434\u043E\u043B\u0436\u043D\u043E \u0431\u044B\u0442\u044C \u0447\u0438\u0441\u043B\u043E\u043C",
+	                                    placeholder: "\u0417\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \u0434\u043E\u043B\u0436\u043D\u043E \u0431\u044B\u0442\u044C \u043F\u043E\u043B\u043E\u0436\u0438\u0442\u0435\u043B\u044C\u043D\u044B\u043C \u0447\u0438\u0441\u043B\u043E\u043C",
 	                                    onChange: this.handleSettingsChange
 	                                }),
 	                                _react2.default.createElement(_reactBootstrap.FormControl.Feedback, null)
@@ -8664,7 +8669,7 @@
 	         * ===========================================
 	         * ===== Рендер и работа с картой Yandex =====
 	         * ===========================================
-	         * */
+	         */
 
 	        /**
 	         * Функция создания карты и добавления в нее элементов управления
@@ -8712,56 +8717,6 @@
 	                }
 	            });
 
-	            // Кнопка включения и отключения режима редактирования
-	            this.buttonEditor = new ymaps.control.Button({
-	                data: { content: "Режим редактирования" }
-	            });
-
-	            // Кнопка смены мест адресов
-	            this.buttonSwap = new ymaps.control.Button({
-	                data: { content: "Сменить адреса" }
-	            });
-
-	            // При входе в режим редактирования, делаем видимыми поля поиска и кнопку смена адресов
-	            // И присваиваем переменной editMode значение true, что в свою очередь отображает предупреждение о входе в режим
-	            this.buttonEditor.events.add("select", function () {
-	                this.buttonSwap.options.set('visible', true);
-	                this.searchStartPoint.options.set('visible', true);
-	                this.searchFinishPoint.options.set('visible', true);
-	                this.setState({ editMode: true });
-	                if (this.multiRoute) {
-	                    this.multiRoute.editor.start({
-	                        addWayPoints: false,
-	                        dragWayPoints: true,
-	                        addMidPoints: false
-	                    });
-	                }
-	            }.bind(this));
-
-	            // При выходе из режима редактирования прячем элементы редактирования маршрута и скрываем предупреждение
-	            this.buttonEditor.events.add("deselect", function () {
-	                this.buttonSwap.options.set('visible', false);
-	                this.searchStartPoint.options.set('visible', false);
-	                this.searchFinishPoint.options.set('visible', false);
-	                this.setState({ editMode: false });
-	                // Выключение режима редактирования.
-	                if (this.multiRoute) {
-	                    this.multiRoute.editor.stop();
-	                }
-	            }.bind(this));
-
-	            // Событие нажатия кнопки смена адресов
-	            this.buttonSwap.events.add("click", function () {
-	                _this2.swapAddresses();
-	            });
-
-	            // Добавляем на карту элементы управления
-	            this.myMap.controls.add(this.searchStartPoint);
-	            this.myMap.controls.add(this.searchFinishPoint);
-	            this.myMap.controls.add(this.buttonEditor);
-	            this.myMap.controls.add(this.buttonSwap);
-	            this.myMap.events.add('click', this.onClick);
-
 	            /**
 	             * Добавляем обработу событий для поисковых полей
 	             *
@@ -8807,7 +8762,120 @@
 	                }
 	            }.bind(this));
 
+	            // Кнопка включения и отключения режима редактирования
+	            this.buttonEditor = new ymaps.control.Button({
+	                data: { content: "Режим редактирования" }
+	            });
+
+	            // Кнопка смены мест адресов
+	            this.buttonSwap = new ymaps.control.Button({
+	                data: { content: "Сменить адреса" }
+	            });
+
+	            // При входе в режим редактирования, делаем видимыми поля поиска и кнопку смена адресов
+	            // И присваиваем переменной editMode значение true, что в свою очередь отображает предупреждение о входе в режим
+	            this.buttonEditor.events.add("select", function () {
+	                this.buttonSwap.options.set('visible', true);
+	                this.searchStartPoint.options.set('visible', true);
+	                this.searchFinishPoint.options.set('visible', true);
+	                this.setState({ editMode: true });
+	                if (this.multiRoute) {
+	                    this.multiRoute.editor.start({
+	                        addWayPoints: false,
+	                        dragWayPoints: true,
+	                        addMidPoints: false
+	                    });
+	                }
+	            }.bind(this));
+
+	            // При выходе из режима редактирования прячем элементы редактирования маршрута и скрываем предупреждение
+	            this.buttonEditor.events.add("deselect", function () {
+	                this.buttonSwap.options.set('visible', false);
+	                this.searchStartPoint.options.set('visible', false);
+	                this.searchFinishPoint.options.set('visible', false);
+	                this.setState({ editMode: false });
+	                // Выключение режима редактирования.
+	                if (this.multiRoute) {
+	                    this.multiRoute.editor.stop();
+	                }
+	            }.bind(this));
+
+	            // Событие нажатия кнопки смена адресов
+	            this.buttonSwap.events.add("click", function () {
+	                _this2.swapAddresses();
+	            });
+
+	            // Создаем элемент для отображения данных по проложенному маршруту:
+	            // расход на 100 км., стоимость за 1 л., расстояние, расход на маршурт, стоиомсть за весь маршрут
+
+	            // И наследуем RouteInfo от collection.Item для добавления его как элемент управления
+	            ymaps.util.augment(RouteInfo, ymaps.collection.Item, {
+	                onAddToMap: function onAddToMap(map) {
+	                    RouteInfo.superclass.onAddToMap.call(this, map);
+	                    this.getParent().getChildElement(this).then(this.onGetChildElement, this);
+	                },
+
+	                onRemoveFromMap: function onRemoveFromMap(oldMap) {
+	                    if (this.content) {
+	                        this.content.remove();
+	                    }
+	                    RouteInfo.superclass.onRemoveFromMap.call(this, oldMap);
+	                },
+
+	                onGetChildElement: function onGetChildElement(parentDomContainer) {
+	                    var fuelConsumptionPerHundred = this.options.get('fuelConsumption');
+	                    var fuelPricePerLitre = this.options.get('fuelPrice');
+	                    var routeLength = this.options.get('routeLength');
+	                    var fuelTotalConsumption = routeLength / 100 * fuelConsumptionPerHundred;
+	                    var fuelTotalPrice = fuelTotalConsumption * fuelPricePerLitre;
+
+	                    var settingsText = "Расход на 100 км.: " + fuelConsumptionPerHundred + "<br>" + "Стоимость 1л.: " + fuelPricePerLitre;
+
+	                    var routeText = '';
+
+	                    if (routeLength != null) {
+	                        routeText = "<hr>Длина пути: " + routeLength.toFixed(3) + "<br>" + "Расход топлива: " + fuelTotalConsumption.toFixed(2) + "<br>" + "Стоимость поездки: " + fuelTotalPrice.toFixed(2);
+	                    }
+
+	                    // Создаем HTML-элемент с текстом.
+	                    this.content = document.createElement('div');
+	                    this.content.className = "well";
+	                    this.content.innerHTML = settingsText.concat(routeText);
+
+	                    parentDomContainer.appendChild(this.content);
+	                }
+	            });
+
+	            this.routeInfo = new RouteInfo();
+
+	            this.addRouteInfo();
+
+	            // Добавляем на карту элементы управления
+	            this.myMap.controls.add(this.searchStartPoint);
+	            this.myMap.controls.add(this.searchFinishPoint);
+	            this.myMap.controls.add(this.buttonEditor);
+	            this.myMap.controls.add(this.buttonSwap);
+	            this.myMap.events.add('click', this.onClick);
+
 	            this.buttonEditor.select();
+	        }
+	    }, {
+	        key: "addRouteInfo",
+	        value: function addRouteInfo() {
+	            var routeLength = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : null;
+
+	            this.myMap.controls.remove(this.routeInfo);
+
+	            this.myMap.controls.add(this.routeInfo, {
+	                fuelConsumption: this.state.fuelConsumption,
+	                fuelPrice: this.state.fuelPrice,
+	                routeLength: routeLength,
+	                float: 'none',
+	                position: {
+	                    top: 90,
+	                    left: 10
+	                }
+	            });
 	        }
 
 	        /**
@@ -8852,6 +8920,7 @@
 	                    // и записываем их в координаты для построения маршрута
 	                    var startPoint = this.multiRoute.properties.get('waypoints.0.coordinates').reverse();
 	                    var finishPoint = this.multiRoute.properties.get('waypoints.1.coordinates').reverse();
+	                    var routeLength = this.multiRoute.getActiveRoute().properties.get('distance').value / 1000;
 
 	                    this.setState({ startPointCoords: startPoint });
 	                    this.setState({ finishPointCoords: finishPoint });
@@ -8859,16 +8928,23 @@
 	                    // Записываем в поля поиска новые адреса точен
 	                    // Приходится использовать опцию 'noSuggestPanel' чтобы избежать постоянного появления всплывающих окон
 	                    // с результатами поиска по введенному адресу
-	                    ymaps.geocode(startPoint).then(function (res) {
+	                    ymaps.geocode(startPoint, { results: 1 }).then(function (res) {
 	                        this.searchStartPoint.options.set('noSuggestPanel', true);
 	                        this.searchStartPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
 	                        this.searchStartPoint.options.set('noSuggestPanel', false);
 	                    }.bind(this));
-	                    ymaps.geocode(finishPoint).then(function (res) {
+	                    ymaps.geocode(finishPoint, { results: 1 }).then(function (res) {
 	                        this.searchFinishPoint.options.set('noSuggestPanel', true);
 	                        this.searchFinishPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
 	                        this.searchFinishPoint.options.set('noSuggestPanel', false);
 	                    }.bind(this));
+
+	                    this.addRouteInfo(routeLength);
+	                }.bind(this));
+
+	                this.multiRoute.events.add('activeroutechange', function () {
+	                    var routeLength = this.multiRoute.getActiveRoute().properties.get('distance').value / 1000;
+	                    this.addRouteInfo(routeLength);
 	                }.bind(this));
 
 	                // Добавляем на карту новый маршрут
@@ -8895,7 +8971,7 @@
 	                    this.setState({ finishPointCoords: coords });
 
 	                    // Записываем адрес в поисковую строку
-	                    ymaps.geocode(coords).then(function (res) {
+	                    ymaps.geocode(coords, { results: 1 }).then(function (res) {
 	                        this.searchFinishPoint.options.set('noSuggestPanel', true);
 	                        this.searchFinishPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
 	                        this.searchFinishPoint.options.set('noSuggestPanel', false);
@@ -8913,7 +8989,7 @@
 	                    this.setState({ startPointCoords: _coords });
 
 	                    // Записываем адрес в поисковую строку
-	                    ymaps.geocode(_coords).then(function (res) {
+	                    ymaps.geocode(_coords, { results: 1 }).then(function (res) {
 	                        this.searchStartPoint.options.set('noSuggestPanel', true);
 	                        this.searchStartPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
 	                        this.searchStartPoint.options.set('noSuggestPanel', false);
@@ -8947,7 +9023,7 @@
 	                this.state.startPoint.events.add('dragend', function (event) {
 	                    var coords = event.originalEvent.target.geometry.getCoordinates();
 	                    this.setState({ startPointCoords: coords });
-	                    ymaps.geocode(coords).then(function (res) {
+	                    ymaps.geocode(coords, { results: 1 }).then(function (res) {
 	                        this.searchStartPoint.options.set('noSuggestPanel', true);
 	                        this.searchStartPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
 	                        this.searchStartPoint.options.set('noSuggestPanel', false);
@@ -8962,14 +9038,14 @@
 	                this.myMap.geoObjects.add(this.state.startPoint);
 	            }
 	        }
-	    }, {
-	        key: "setFinishPoint",
-
 
 	        /**
 	         * Создаем конечную точку маршрута.
 	         * Если точка создана, то обновляем координаты.
 	         */
+
+	    }, {
+	        key: "setFinishPoint",
 	        value: function setFinishPoint(position) {
 	            if (this.state.finishPoint) {
 	                this.state.finishPoint.geometry.setCoordinates(position);
@@ -8980,7 +9056,7 @@
 	                this.state.finishPoint.events.add('dragend', function (event) {
 	                    var coords = event.originalEvent.target.geometry.getCoordinates();
 	                    this.setState({ finishPointCoords: coords });
-	                    ymaps.geocode(coords).then(function (res) {
+	                    ymaps.geocode(coords, { results: 1 }).then(function (res) {
 	                        this.searchFinishPoint.options.set('noSuggestPanel', true);
 	                        this.searchFinishPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
 	                        this.searchFinishPoint.options.set('noSuggestPanel', false);
@@ -8995,26 +9071,26 @@
 	                this.myMap.geoObjects.add(this.state.finishPoint);
 	            }
 	        }
-	    }, {
-	        key: "swapAddresses",
-
 
 	        /**
 	         * Функция смена адресов
 	         * Меняем местами координаты маршрута и адреса точек
 	         */
+
+	    }, {
+	        key: "swapAddresses",
 	        value: function swapAddresses() {
 	            if (this.state.startPointCoords && this.state.finishPointCoords) {
 	                var tempAddress = this.state.startPointCoords;
 	                this.setState({ startPointCoords: this.state.finishPointCoords });
 	                this.setState({ finishPointCoords: tempAddress });
 
-	                ymaps.geocode(this.state.startPointCoords).then(function (res) {
+	                ymaps.geocode(this.state.startPointCoords, { results: 1 }).then(function (res) {
 	                    this.searchStartPoint.options.set('noSuggestPanel', true);
 	                    this.searchStartPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
 	                    this.searchStartPoint.options.set('noSuggestPanel', false);
 	                }.bind(this));
-	                ymaps.geocode(this.state.finishPointCoords).then(function (res) {
+	                ymaps.geocode(this.state.finishPointCoords, { results: 1 }).then(function (res) {
 	                    this.searchFinishPoint.options.set('noSuggestPanel', true);
 	                    this.searchFinishPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
 	                    this.searchFinishPoint.options.set('noSuggestPanel', false);
@@ -9089,6 +9165,13 @@
 
 	    return Map;
 	}(_react.Component);
+
+	var RouteInfo = function RouteInfo(options) {
+	    _classCallCheck(this, RouteInfo);
+
+	    RouteInfo.superclass.constructor.call(this, options);
+	    this.content = null;
+	};
 
 	/**
 	 * Указываем что значения расхода и стоимости топлива должжны быть числами и что они обязательны для ввода

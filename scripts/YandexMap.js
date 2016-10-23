@@ -64,6 +64,11 @@ class Map extends Component {
     saveSettings() {
         if (this.fuelConsumptionValidation() == 'success' && this.fuelPriceValidation() == 'success') {
             this.setState({showModal: false});
+
+            if(this.multiRoute) {
+                let routeLength = this.multiRoute.getActiveRoute().properties.get('distance').value / 1000;
+                this.addRouteInfo(routeLength);
+            }
         }
     }
 
@@ -139,7 +144,7 @@ class Map extends Component {
                                 <FormControl
                                     type="text"
                                     value={this.state.fuelConsumption}
-                                    placeholder="Значение должно быть числом"
+                                    placeholder="Значение должно быть положительным числом"
                                     onChange={this.handleSettingsChange}
                                 />
                                 <FormControl.Feedback />
@@ -149,11 +154,11 @@ class Map extends Component {
                                 controlId="fuelPrice"
                                 validationState={this.fuelPriceValidation(this)}
                             >
-                                <ControlLabel>Введите тоимость топлива.</ControlLabel>
+                                <ControlLabel>Введите стоимость топлива.</ControlLabel>
                                 <FormControl
                                     type="text"
                                     value={this.state.fuelPrice}
-                                    placeholder="Значение должно быть числом"
+                                    placeholder="Значение должно быть положительным числом"
                                     onChange={this.handleSettingsChange}
                                 />
                                 <FormControl.Feedback />
@@ -177,7 +182,7 @@ class Map extends Component {
      * ===========================================
      * ===== Рендер и работа с картой Yandex =====
      * ===========================================
-     * */
+     */
 
     /**
      * Функция создания карты и добавления в нее элементов управления
@@ -219,56 +224,6 @@ class Map extends Component {
                 visible: this.state.editMode
             }
         });
-
-        // Кнопка включения и отключения режима редактирования
-        this.buttonEditor = new ymaps.control.Button({
-            data: {content: "Режим редактирования"}
-        });
-
-        // Кнопка смены мест адресов
-        this.buttonSwap = new ymaps.control.Button({
-            data: {content: "Сменить адреса"}
-        });
-
-        // При входе в режим редактирования, делаем видимыми поля поиска и кнопку смена адресов
-        // И присваиваем переменной editMode значение true, что в свою очередь отображает предупреждение о входе в режим
-        this.buttonEditor.events.add("select", function () {
-            this.buttonSwap.options.set('visible', true);
-            this.searchStartPoint.options.set('visible', true);
-            this.searchFinishPoint.options.set('visible', true);
-            this.setState({editMode: true});
-            if (this.multiRoute) {
-                this.multiRoute.editor.start({
-                    addWayPoints: false,
-                    dragWayPoints: true,
-                    addMidPoints: false,
-                });
-            }
-        }.bind(this));
-
-        // При выходе из режима редактирования прячем элементы редактирования маршрута и скрываем предупреждение
-        this.buttonEditor.events.add("deselect", function () {
-            this.buttonSwap.options.set('visible', false);
-            this.searchStartPoint.options.set('visible', false);
-            this.searchFinishPoint.options.set('visible', false);
-            this.setState({editMode: false});
-            // Выключение режима редактирования.
-            if (this.multiRoute) {
-                this.multiRoute.editor.stop();
-            }
-        }.bind(this));
-
-        // Событие нажатия кнопки смена адресов
-        this.buttonSwap.events.add("click", () => {
-            this.swapAddresses()
-        });
-
-        // Добавляем на карту элементы управления
-        this.myMap.controls.add(this.searchStartPoint);
-        this.myMap.controls.add(this.searchFinishPoint);
-        this.myMap.controls.add(this.buttonEditor);
-        this.myMap.controls.add(this.buttonSwap);
-        this.myMap.events.add('click', this.onClick);
 
         /**
          * Добавляем обработу событий для поисковых полей
@@ -319,7 +274,122 @@ class Map extends Component {
                 }
             }.bind(this));
 
+        // Кнопка включения и отключения режима редактирования
+        this.buttonEditor = new ymaps.control.Button({
+            data: {content: "Режим редактирования"}
+        });
+
+        // Кнопка смены мест адресов
+        this.buttonSwap = new ymaps.control.Button({
+            data: {content: "Сменить адреса"}
+        });
+
+        // При входе в режим редактирования, делаем видимыми поля поиска и кнопку смена адресов
+        // И присваиваем переменной editMode значение true, что в свою очередь отображает предупреждение о входе в режим
+        this.buttonEditor.events.add("select", function () {
+            this.buttonSwap.options.set('visible', true);
+            this.searchStartPoint.options.set('visible', true);
+            this.searchFinishPoint.options.set('visible', true);
+            this.setState({editMode: true});
+            if (this.multiRoute) {
+                this.multiRoute.editor.start({
+                    addWayPoints: false,
+                    dragWayPoints: true,
+                    addMidPoints: false,
+                });
+            }
+        }.bind(this));
+
+        // При выходе из режима редактирования прячем элементы редактирования маршрута и скрываем предупреждение
+        this.buttonEditor.events.add("deselect", function () {
+            this.buttonSwap.options.set('visible', false);
+            this.searchStartPoint.options.set('visible', false);
+            this.searchFinishPoint.options.set('visible', false);
+            this.setState({editMode: false});
+            // Выключение режима редактирования.
+            if (this.multiRoute) {
+                this.multiRoute.editor.stop();
+            }
+        }.bind(this));
+
+        // Событие нажатия кнопки смена адресов
+        this.buttonSwap.events.add("click", () => {
+            this.swapAddresses()
+        });
+
+        // Создаем элемент для отображения данных по проложенному маршруту:
+        // расход на 100 км., стоимость за 1 л., расстояние, расход на маршурт, стоиомсть за весь маршрут
+
+        // И наследуем RouteInfo от collection.Item для добавления его как элемент управления
+        ymaps.util.augment(RouteInfo, ymaps.collection.Item, {
+            onAddToMap: function (map) {
+                RouteInfo.superclass.onAddToMap.call(this, map);
+                this.getParent().getChildElement(this).then(this.onGetChildElement, this);
+            },
+
+            onRemoveFromMap: function (oldMap) {
+                if (this.content) {
+                    this.content.remove();
+                }
+                RouteInfo.superclass.onRemoveFromMap.call(this, oldMap);
+            },
+
+            onGetChildElement: function (parentDomContainer) {
+                let fuelConsumptionPerHundred = this.options.get('fuelConsumption');
+                let fuelPricePerLitre = this.options.get('fuelPrice');
+                let routeLength = this.options.get('routeLength');
+                let fuelTotalConsumption = (routeLength / 100) * fuelConsumptionPerHundred;
+                let fuelTotalPrice = fuelTotalConsumption * fuelPricePerLitre;
+
+                let settingsText =
+                    "Расход на 100 км.: " + fuelConsumptionPerHundred + "<br>" +
+                    "Стоимость 1л.: " + fuelPricePerLitre;
+
+                let routeText = '';
+
+                if (routeLength != null) {
+                    routeText =
+                        "<hr>Длина пути: " + routeLength.toFixed(3) + "<br>" +
+                        "Расход топлива: " + fuelTotalConsumption.toFixed(2) + "<br>" +
+                        "Стоимость поездки: " + fuelTotalPrice.toFixed(2);
+                }
+
+                // Создаем HTML-элемент с текстом.
+                this.content = document.createElement('div');
+                this.content.className = "well";
+                this.content.innerHTML = settingsText.concat(routeText);
+
+                parentDomContainer.appendChild(this.content);
+            },
+        });
+
+        this.routeInfo = new RouteInfo();
+
+        this.addRouteInfo();
+
+        // Добавляем на карту элементы управления
+        this.myMap.controls.add(this.searchStartPoint);
+        this.myMap.controls.add(this.searchFinishPoint);
+        this.myMap.controls.add(this.buttonEditor);
+        this.myMap.controls.add(this.buttonSwap);
+        this.myMap.events.add('click', this.onClick);
+
         this.buttonEditor.select();
+    }
+
+    addRouteInfo(routeLength = null) {
+        this.myMap.controls.remove(this.routeInfo);
+
+        this.myMap.controls.add(this.routeInfo, {
+            fuelConsumption: this.state.fuelConsumption,
+            fuelPrice: this.state.fuelPrice,
+            routeLength: routeLength,
+            float: 'none',
+            position: {
+                top: 90,
+                left: 10
+            }
+        });
     }
 
     /**
@@ -361,6 +431,7 @@ class Map extends Component {
                 // и записываем их в координаты для построения маршрута
                 let startPoint = this.multiRoute.properties.get('waypoints.0.coordinates').reverse();
                 let finishPoint = this.multiRoute.properties.get('waypoints.1.coordinates').reverse();
+                let routeLength = this.multiRoute.getActiveRoute().properties.get('distance').value / 1000;
 
                 this.setState({startPointCoords: startPoint});
                 this.setState({finishPointCoords: finishPoint});
@@ -368,16 +439,23 @@ class Map extends Component {
                 // Записываем в поля поиска новые адреса точен
                 // Приходится использовать опцию 'noSuggestPanel' чтобы избежать постоянного появления всплывающих окон
                 // с результатами поиска по введенному адресу
-                ymaps.geocode(startPoint).then(function (res) {
+                ymaps.geocode(startPoint, {results: 1}).then(function (res) {
                     this.searchStartPoint.options.set('noSuggestPanel', true);
                     this.searchStartPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
                     this.searchStartPoint.options.set('noSuggestPanel', false);
                 }.bind(this));
-                ymaps.geocode(finishPoint).then(function (res) {
+                ymaps.geocode(finishPoint, {results: 1}).then(function (res) {
                     this.searchFinishPoint.options.set('noSuggestPanel', true);
                     this.searchFinishPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
                     this.searchFinishPoint.options.set('noSuggestPanel', false);
                 }.bind(this));
+
+                this.addRouteInfo(routeLength);
+            }.bind(this));
+
+            this.multiRoute.events.add('activeroutechange', function () {
+                let routeLength = this.multiRoute.getActiveRoute().properties.get('distance').value / 1000;
+                this.addRouteInfo(routeLength);
             }.bind(this));
 
             // Добавляем на карту новый маршрут
@@ -401,7 +479,7 @@ class Map extends Component {
                 this.setState({finishPointCoords: coords});
 
                 // Записываем адрес в поисковую строку
-                ymaps.geocode(coords).then(function (res) {
+                ymaps.geocode(coords, {results: 1}).then(function (res) {
                     this.searchFinishPoint.options.set('noSuggestPanel', true);
                     this.searchFinishPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
                     this.searchFinishPoint.options.set('noSuggestPanel', false);
@@ -419,7 +497,7 @@ class Map extends Component {
                 this.setState({startPointCoords: coords});
 
                 // Записываем адрес в поисковую строку
-                ymaps.geocode(coords).then(function (res) {
+                ymaps.geocode(coords, {results: 1}).then(function (res) {
                     this.searchStartPoint.options.set('noSuggestPanel', true);
                     this.searchStartPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
                     this.searchStartPoint.options.set('noSuggestPanel', false);
@@ -450,7 +528,7 @@ class Map extends Component {
             this.state.startPoint.events.add('dragend', function (event) {
                 let coords = event.originalEvent.target.geometry.getCoordinates();
                 this.setState({startPointCoords: coords});
-                ymaps.geocode(coords).then(function (res) {
+                ymaps.geocode(coords, {results: 1}).then(function (res) {
                     this.searchStartPoint.options.set('noSuggestPanel', true);
                     this.searchStartPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
                     this.searchStartPoint.options.set('noSuggestPanel', false);
@@ -465,7 +543,6 @@ class Map extends Component {
             this.myMap.geoObjects.add(this.state.startPoint);
         }
     }
-    ;
 
     /**
      * Создаем конечную точку маршрута.
@@ -481,7 +558,7 @@ class Map extends Component {
             this.state.finishPoint.events.add('dragend', function (event) {
                 let coords = event.originalEvent.target.geometry.getCoordinates();
                 this.setState({finishPointCoords: coords});
-                ymaps.geocode(coords).then(function (res) {
+                ymaps.geocode(coords, {results: 1}).then(function (res) {
                     this.searchFinishPoint.options.set('noSuggestPanel', true);
                     this.searchFinishPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
                     this.searchFinishPoint.options.set('noSuggestPanel', false);
@@ -496,7 +573,6 @@ class Map extends Component {
             this.myMap.geoObjects.add(this.state.finishPoint);
         }
     }
-    ;
 
     /**
      * Функция смена адресов
@@ -508,12 +584,12 @@ class Map extends Component {
             this.setState({startPointCoords: this.state.finishPointCoords});
             this.setState({finishPointCoords: tempAddress});
 
-            ymaps.geocode(this.state.startPointCoords).then(function (res) {
+            ymaps.geocode(this.state.startPointCoords, {results: 1}).then(function (res) {
                 this.searchStartPoint.options.set('noSuggestPanel', true);
                 this.searchStartPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
                 this.searchStartPoint.options.set('noSuggestPanel', false);
             }.bind(this));
-            ymaps.geocode(this.state.finishPointCoords).then(function (res) {
+            ymaps.geocode(this.state.finishPointCoords, {results: 1}).then(function (res) {
                 this.searchFinishPoint.options.set('noSuggestPanel', true);
                 this.searchFinishPoint.state.set('inputValue', res.geoObjects.get(0).properties.get('text'));
                 this.searchFinishPoint.options.set('noSuggestPanel', false);
@@ -564,6 +640,13 @@ class Map extends Component {
                 </Row>
             </div>
         );
+    }
+}
+
+class RouteInfo {
+    constructor(options) {
+        RouteInfo.superclass.constructor.call(this, options);
+        this.content = null;
     }
 }
 
