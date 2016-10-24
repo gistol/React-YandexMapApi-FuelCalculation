@@ -1,0 +1,13 @@
+/* Исправление изменения padding-right при открытии и закрытии всплывающего окна меню настроек*/
+/*body.modal-open {*/
+    /*padding-right: 15px !important;*/
+/*}*/
+
+/*.main {*/
+    /*margin-top: 10px;*/
+/*}*/
+
+/*#map {*/
+    /*height: 450px;*/
+    /*width: 680px;*/
+/*}*/

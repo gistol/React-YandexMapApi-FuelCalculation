@@ -65,7 +65,7 @@
 /******/ 	}
 /******/ 	
 /******/ 	var hotApplyOnUpdate = true;
-/******/ 	var hotCurrentHash = "855d5411c0ca14a78021"; // eslint-disable-line no-unused-vars
+/******/ 	var hotCurrentHash = "24c91dcdde82893cbab5"; // eslint-disable-line no-unused-vars
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentParents = []; // eslint-disable-line no-unused-vars
 /******/ 	
@@ -8446,15 +8446,20 @@
 
 	        _this.state = {
 	            // При запуске приложения показываем диалог ввода данных расхода и стоимости топлива
-	            showModal: false,
+	            showModal: true,
 	            // Задаем первичные значения расхода и стоимости топлива исходя из передынных props
 	            fuelConsumption: _this.props.fuelConsumptionInitialValue,
 	            fuelPrice: _this.props.fuelPriceInitialValue,
 	            oldFuelConsumption: _this.props.fuelConsumptionInitialValue,
 	            oldFuelPrice: _this.props.fuelPriceInitialValue,
 
+	            // Проверка и запись в state параметров карты.
+	            // В случае слишком маленьких размеров, устанавливаем минимальные чтобы элементы не заходили друг на друга
+	            mapWidth: _this.props.mapWidth > 550 ? _this.props.mapWidth : 550,
+	            mapHeight: _this.props.mapHeight > 350 ? _this.props.mapHeight : 350,
+
 	            // Переменная для обозначения активности режима редактирования маршурта
-	            editMode: false,
+	            editMode: true,
 
 	            // Координаты точек на карте для обозначения адресов до того как маршрут построен
 	            startPoint: null,
@@ -8470,11 +8475,16 @@
 	        _this.closeSettings = _this.closeSettings.bind(_this);
 	        _this.openSettings = _this.openSettings.bind(_this);
 	        _this.handleSettingsChange = _this.handleSettingsChange.bind(_this);
+	        _this.fuelConsumptionValidation = _this.fuelConsumptionValidation.bind(_this);
+	        _this.fuelPriceValidation = _this.fuelPriceValidation.bind(_this);
 
 	        _this.onClick = _this.onClick.bind(_this);
+	        _this.buildRoute = _this.buildRoute.bind(_this);
+	        _this.addRouteInfo = _this.addRouteInfo.bind(_this);
 	        _this.createMap = _this.createMap.bind(_this);
 	        _this.setStartPoint = _this.setStartPoint.bind(_this);
 	        _this.setFinishPoint = _this.setFinishPoint.bind(_this);
+	        _this.swapAddresses = _this.swapAddresses.bind(_this);
 	        _this.drawMap();
 	        return _this;
 	    }
@@ -8496,9 +8506,14 @@
 	            if (this.fuelConsumptionValidation() == 'success' && this.fuelPriceValidation() == 'success') {
 	                this.setState({ showModal: false });
 
+	                var routeLength = null;
+
 	                if (this.multiRoute) {
-	                    var routeLength = this.multiRoute.getActiveRoute().properties.get('distance').value / 1000;
+	                    routeLength = this.multiRoute.getActiveRoute().properties.get('distance').value / 1000;
+	                }
+	                if (this.myMap) {
 	                    this.addRouteInfo(routeLength);
+	                    this.buttonSettings.deselect();
 	                }
 	            }
 	        }
@@ -8513,6 +8528,7 @@
 	            this.setState({ fuelConsumption: this.state.oldFuelConsumption });
 	            this.setState({ fuelPrice: this.state.oldFuelPrice });
 	            this.setState({ showModal: false });
+	            this.buttonSettings.deselect();
 	        }
 
 	        /**
@@ -8575,15 +8591,6 @@
 	            return _react2.default.createElement(
 	                "div",
 	                { className: "modal-container" },
-	                _react2.default.createElement(
-	                    "div",
-	                    { id: "menu", className: "pull-right" },
-	                    _react2.default.createElement(
-	                        _reactBootstrap.Button,
-	                        { bsStyle: "primary", onClick: this.openSettings },
-	                        _react2.default.createElement(_reactBootstrap.Glyphicon, { glyph: "cog" })
-	                    )
-	                ),
 	                _react2.default.createElement(
 	                    _reactBootstrap.Modal,
 	                    { show: this.state.showModal, onHide: this.closeSettings },
@@ -8656,11 +8663,6 @@
 	                            "\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C"
 	                        )
 	                    )
-	                ),
-	                _react2.default.createElement(
-	                    "div",
-	                    { className: "col-lg-12" },
-	                    _react2.default.createElement("hr", null)
 	                )
 	            );
 	        }
@@ -8672,23 +8674,54 @@
 	         */
 
 	        /**
-	         * Функция создания карты и добавления в нее элементов управления
+	         * Функция определения местоположения пользователя и создания карты
 	         */
 
 	    }, {
 	        key: "createMap",
 	        value: function createMap() {
-	            var _this2 = this;
+	            this.myMap = null;
+	            // Получение координат местоположения пользователя
+	            ymaps.geolocation.get().then(function (res) {
+	                var mapCenterAndZoom = ymaps.util.bounds.getCenterAndZoom(res.geoObjects.get(0).properties.get('boundedBy'), [this.state.mapWidth, this.state.mapHeight]);
 
-	            // Создание карты с заданным центром и приближением
-	            this.myMap = new ymaps.Map('map', {
-	                center: [55.750475, 37.616273],
-	                zoom: 9,
-	                type: 'yandex#map',
-	                controls: []
-	            }, {
-	                buttonMaxWidth: 300
+	                this.myMap = new ymaps.Map('map', {
+	                    center: mapCenterAndZoom.center,
+	                    zoom: mapCenterAndZoom.zoom,
+	                    type: 'yandex#map',
+	                    controls: []
+	                }, {
+	                    buttonMaxWidth: 300
+	                });
+
+	                this.addControlsToMap();
+	                this.addRouteInfo();
+	            }.bind(this), function () {
+	                // Если место положение невозможно получить, то просто создаем карту.
+	                this.myMap = new ymaps.Map('map', {
+	                    center: [55.750475, 37.616273],
+	                    zoom: 9,
+	                    type: 'yandex#map',
+	                    controls: []
+	                }, {
+	                    buttonMaxWidth: 300
+	                });
+
+	                console.log('asdf');
+
+	                this.addControlsToMap();
+	                this.addRouteInfo();
 	            });
+	        }
+
+	        /**
+	         * Добавление элементов управления на карту
+	         */
+
+	    }, {
+	        key: "addControlsToMap",
+	        value: function addControlsToMap() {
+	            var _this2 = this;
 
 	            // Поисковое поле для начала маршрута
 	            this.searchStartPoint = new ymaps.control.SearchControl({
@@ -8734,9 +8767,7 @@
 	                var results = this.searchStartPoint.getResultsArray();
 	                var selected = e.get('index');
 	                var point = results[selected].geometry.getCoordinates();
-
 	                this.setState({ startPointCoords: point });
-
 	                if (!this.buildRoute()) {
 	                    this.setStartPoint(point);
 	                }
@@ -8750,9 +8781,7 @@
 	                var results = this.searchFinishPoint.getResultsArray();
 	                var selected = e.get('index');
 	                var point = results[selected].geometry.getCoordinates();
-
 	                this.setState({ finishPointCoords: point });
-
 	                if (!this.buildRoute()) {
 	                    this.setFinishPoint(point);
 	                }
@@ -8764,12 +8793,25 @@
 
 	            // Кнопка включения и отключения режима редактирования
 	            this.buttonEditor = new ymaps.control.Button({
-	                data: { content: "Режим редактирования" }
+	                data: { content: "Режим редактирования" },
+	                options: {
+	                    float: "right",
+	                    floatIndex: 0
+	                }
 	            });
 
 	            // Кнопка смены мест адресов
 	            this.buttonSwap = new ymaps.control.Button({
 	                data: { content: "Сменить адреса" }
+	            });
+
+	            // Кнопка смены мест адресов
+	            this.buttonSettings = new ymaps.control.Button({
+	                data: { image: "img/cog.png" },
+	                options: {
+	                    float: "right",
+	                    floatIndex: 1
+	                }
 	            });
 
 	            // При входе в режим редактирования, делаем видимыми поля поиска и кнопку смена адресов
@@ -8778,14 +8820,17 @@
 	                this.buttonSwap.options.set('visible', true);
 	                this.searchStartPoint.options.set('visible', true);
 	                this.searchFinishPoint.options.set('visible', true);
+	                var routeLength = null;
 	                this.setState({ editMode: true });
 	                if (this.multiRoute) {
+	                    routeLength = this.multiRoute.getActiveRoute().properties.get('distance').value / 1000;
 	                    this.multiRoute.editor.start({
 	                        addWayPoints: false,
 	                        dragWayPoints: true,
 	                        addMidPoints: false
 	                    });
 	                }
+	                this.addRouteInfo(routeLength);
 	            }.bind(this));
 
 	            // При выходе из режима редактирования прячем элементы редактирования маршрута и скрываем предупреждение
@@ -8793,16 +8838,24 @@
 	                this.buttonSwap.options.set('visible', false);
 	                this.searchStartPoint.options.set('visible', false);
 	                this.searchFinishPoint.options.set('visible', false);
+	                var routeLength = null;
 	                this.setState({ editMode: false });
 	                // Выключение режима редактирования.
 	                if (this.multiRoute) {
+	                    routeLength = this.multiRoute.getActiveRoute().properties.get('distance').value / 1000;
 	                    this.multiRoute.editor.stop();
 	                }
+	                this.addRouteInfo(routeLength);
 	            }.bind(this));
 
-	            // Событие нажатия кнопки смена адресов
+	            // Событие нажатия кнопки смены адресов
 	            this.buttonSwap.events.add("click", function () {
 	                _this2.swapAddresses();
+	            });
+
+	            // Событие нажатия кнопки вызова настройек расхода и сотимости топлива
+	            this.buttonSettings.events.add("click", function () {
+	                _this2.openSettings();
 	            });
 
 	            // Создаем элемент для отображения данных по проложенному маршруту:
@@ -8848,17 +8901,23 @@
 
 	            this.routeInfo = new RouteInfo();
 
-	            this.addRouteInfo();
-
 	            // Добавляем на карту элементы управления
 	            this.myMap.controls.add(this.searchStartPoint);
 	            this.myMap.controls.add(this.searchFinishPoint);
+	            this.myMap.controls.add(this.buttonSettings);
 	            this.myMap.controls.add(this.buttonEditor);
 	            this.myMap.controls.add(this.buttonSwap);
 	            this.myMap.events.add('click', this.onClick);
 
 	            this.buttonEditor.select();
+
+	            this.addRouteInfo();
 	        }
+
+	        /**
+	         * Добавление информации о маршруте
+	         */
+
 	    }, {
 	        key: "addRouteInfo",
 	        value: function addRouteInfo() {
@@ -8872,7 +8931,7 @@
 	                routeLength: routeLength,
 	                float: 'none',
 	                position: {
-	                    top: 90,
+	                    top: this.state.editMode ? 90 : 10,
 	                    left: 10
 	                }
 	            });
@@ -8903,7 +8962,8 @@
 	                    referencePoints: [this.state.startPointCoords, this.state.finishPointCoords]
 	                }, {
 	                    addMidPoints: false,
-	                    editorDrawOver: false
+	                    editorDrawOver: false,
+	                    boundsAutoApply: true
 	                });
 
 	                // После создания маршрута сразу включаем режим его редактирования
@@ -9121,7 +9181,7 @@
 	        value: function renderMap() {
 	            return _react2.default.createElement(
 	                "div",
-	                null,
+	                { style: { width: this.state.mapWidth + "px" } },
 	                _react2.default.createElement(
 	                    _reactBootstrap.Collapse,
 	                    { "in": this.state.editMode },
@@ -9135,7 +9195,7 @@
 	                        )
 	                    )
 	                ),
-	                _react2.default.createElement("div", { id: "map", className: "col-lg-12" })
+	                _react2.default.createElement("div", { id: "map", style: { height: this.state.mapHeight + "px" } })
 	            );
 	        }
 
@@ -9148,7 +9208,7 @@
 	        value: function render() {
 	            return _react2.default.createElement(
 	                "div",
-	                { className: "main" },
+	                { className: "main", style: { marginTop: "10px" } },
 	                _react2.default.createElement(
 	                    _reactBootstrap.Row,
 	                    null,
@@ -9166,6 +9226,9 @@
 	    return Map;
 	}(_react.Component);
 
+	// Класс информации о маршруте
+
+
 	var RouteInfo = function RouteInfo(options) {
 	    _classCallCheck(this, RouteInfo);
 
@@ -9181,21 +9244,98 @@
 
 	Map.propTypes = {
 	    fuelConsumptionInitialValue: _react2.default.PropTypes.number.isRequired,
-	    fuelPriceInitialValue: _react2.default.PropTypes.number.isRequired
+	    fuelPriceInitialValue: _react2.default.PropTypes.number.isRequired,
+	    mapHeight: _react2.default.PropTypes.number.isRequired,
+	    mapWidth: _react2.default.PropTypes.number.isRequired
 	};
 
 	/**
 	 * Задаем значения по умолчанию
 	 */
 	Map.defaultProps = {
-	    fuelConsumptionInitialValue: 13,
-	    fuelPriceInitialValue: 37.35
+	    fuelConsumptionInitialValue: 10,
+	    fuelPriceInitialValue: 39,
+	    mapHeight: 550,
+	    mapWidth: 1280
 	};
+
+	var Example = function (_Component2) {
+	    _inherits(Example, _Component2);
+
+	    function Example(props) {
+	        _classCallCheck(this, Example);
+
+	        return _possibleConstructorReturn(this, (Example.__proto__ || Object.getPrototypeOf(Example)).call(this, props));
+	    }
+
+	    _createClass(Example, [{
+	        key: "render",
+	        value: function render() {
+	            return _react2.default.createElement(
+	                "div",
+	                null,
+	                _react2.default.createElement(
+	                    "h1",
+	                    { className: "text-center" },
+	                    "\u0420\u0430\u0441\u0447\u0435\u0442 \u043C\u0430\u0440\u0448\u0440\u0443\u0442\u0430 | React + Yandex Map API"
+	                ),
+	                _react2.default.createElement("hr", null),
+	                _react2.default.createElement(Map, { fuelConsumptionInitialValue: 9, fuelPriceInitialValue: 38.5, mapHeight: 550, mapWidth: 1280 }),
+	                _react2.default.createElement("hr", null),
+	                _react2.default.createElement(
+	                    "div",
+	                    null,
+	                    _react2.default.createElement(
+	                        "h4",
+	                        null,
+	                        "\u0417\u0430\u0434\u0430\u0447\u0430:"
+	                    ),
+	                    _react2.default.createElement(
+	                        "p",
+	                        null,
+	                        "\u0421\u043E\u0437\u0434\u0430\u0442\u044C \u0432\u0435\u0431-\u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435, \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u044F api \u042F\u043D\u0434\u0435\u043A\u0441 \u043A\u0430\u0440\u0442 \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0435\u0439 \u0432\u0435\u0440\u0441\u0438\u0438. \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u043B\u044E\u0431\u043E\u0439 \u0444\u0440\u0435\u0439\u043C\u0432\u043E\u0440\u043A (angular, ember, react, backbone, ... )."
+	                    ),
+	                    _react2.default.createElement(
+	                        "ul",
+	                        null,
+	                        _react2.default.createElement(
+	                            "li",
+	                            null,
+	                            "\u041F\u043E\u043A\u0430\u0437\u044B\u0432\u0430\u0435\u0442\u0441\u044F \u043F\u043E\u043F-\u0430\u043F \u0441 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u043C\u0438 1 \u0440\u0430\u0437 \u043F\u0440\u0438 \u043F\u0435\u0440\u0432\u043E\u043C \u0437\u0430\u043F\u0443\u0441\u043A\u0435 \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u044F, \u0437\u0430\u0442\u0435\u043C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043C\u043E\u0436\u043D\u043E \u0432\u044B\u0437\u044B\u0432\u0430\u0442\u044C \u043F\u043E \u043A\u043D\u043E\u043F\u043A\u0435 \u043E\u0442\u043A\u0440\u044B\u0442\u044C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438. \u0412 \u043F\u043E\u043B\u044F\u0445 \u0440\u0430\u0441\u0445\u043E\u0434 \u043D\u0430 100 \u043A\u043C \u0438 \u0446\u0435\u043D\u0430 \u0437\u0430 \u043B\u0438\u0442\u0440 \u0443\u043A\u0430\u0437\u0430\u0442\u044C \u0434\u0435\u043C\u043E-\u0434\u0430\u043D\u043D\u044B\u0435, \u043A\u043E\u0442\u043E\u0440\u044B\u0435 \u0432 \u0434\u0430\u043B\u044C\u043D\u0435\u0439\u0448\u0435\u043C \u043C\u043E\u0436\u043D\u043E \u0431\u0443\u0434\u0435\u0442 \u0440\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C."
+	                        ),
+	                        _react2.default.createElement(
+	                            "li",
+	                            null,
+	                            "\u0412\u0432\u043E\u0434\u0438\u043C \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044F \u0442\u043E\u0447\u0435\u043A \u0410 \u0438 \u0411 (\u043F\u0443\u043D\u043A\u0442\u043E\u0432), \u043F\u0440\u043E\u043A\u043B\u0430\u0434\u044B\u0432\u0430\u0435\u0442\u0441\u044F \u043F\u0443\u0442\u044C \u043D\u0430 \u043A\u0430\u0440\u0442\u0435. \u041F\u0443\u043D\u043A\u0442\u044B \u043C\u043E\u0436\u043D\u043E \u043C\u0435\u043D\u044F\u0442\u044C \u043C\u0435\u0441\u0442\u0430\u043C\u0438, \u0442\u0430\u043A \u0436\u0435 \u0440\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C, \u043D\u0430\u0436\u0430\u0432 \u043A\u043D\u043E\u043F\u043A\u0443 \u0440\u0435\u0436\u0438\u043C \u0440\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u044F, \u043F\u0440\u0438 \u044D\u0442\u043E\u043C \u043F\u043E\u043A\u0430\u0437\u044B\u0432\u0430\u0435\u043C \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044E, \u0447\u0442\u043E \u0440\u0435\u0436\u0438\u043C \u0440\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u044F \u0430\u043A\u0442\u0438\u0432\u0435\u043D. \u0412 \u0440\u0435\u0436\u0438\u043C\u0435 \u0440\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u044F \u043C\u043E\u0436\u043D\u043E \u043F\u0435\u0440\u0435\u0442\u0430\u0441\u043A\u0438\u0432\u0430\u0442\u044C \u0441\u0430\u043C \u043F\u0443\u0442\u044C \u043D\u0430 \u043A\u0430\u0440\u0442\u0435."
+	                        ),
+	                        _react2.default.createElement(
+	                            "li",
+	                            null,
+	                            "\u0418\u043D\u0444\u043E\u0440\u043C\u0430\u0446\u0438\u044F \u043F\u0443\u0442\u044C \u0438 \u043A\u043E\u043B-\u0432\u043E \u0442\u043E\u043F\u043B\u0438\u0432\u0430 \u0432\u044B\u0432\u043E\u0434\u0438\u0442\u0441\u044F \u043D\u0438\u0436\u0435 \u0442\u0435\u043A\u0441\u0442\u043E\u0432\u044B\u0445 \u043F\u043E\u043B\u0435\u0439 \u043C\u0430\u0440\u0448\u0440\u0443\u0442"
+	                        )
+	                    ),
+	                    _react2.default.createElement(
+	                        "p",
+	                        null,
+	                        "\u041F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u0434\u043E\u043B\u0436\u043D\u043E \u0443\u043C\u0435\u0442\u044C \u043F\u0440\u0430\u0432\u0438\u043B\u044C\u043D\u043E \u0440\u0430\u0441\u0441\u0447\u0438\u0442\u044B\u0432\u0430\u0442\u044C \u043F\u0443\u0442\u044C \u0438 \u043A\u043E\u043B\u0438\u0447\u0435\u0441\u0442\u0432\u043E \u0437\u0430\u0442\u0440\u0430\u0447\u0438\u0432\u0430\u0435\u043C\u043E\u0433\u043E \u0442\u043E\u043F\u043B\u0438\u0432\u0430 \u0434\u043B\u044F \u0434\u0430\u043D\u043D\u043E\u0433\u043E \u043F\u0443\u0442\u0438."
+	                    )
+	                )
+	            );
+	        }
+	    }]);
+
+	    return Example;
+	}(_react.Component);
 
 	/**
 	 * Выводим созданный класс на страницу пользователю
 	 */
-	_reactDom2.default.render(_react2.default.createElement(Map, null), document.getElementById('content'));
+	// ReactDOM.render(
+	//     <Map fuelConsumptionInitialValue={9} fuelPriceInitialValue={38.5} mapHeight={550} mapWidth={1280}/>,
+	//     document.getElementById('content')
+	// );
+
+	_reactDom2.default.render(_react2.default.createElement(Example, null), document.getElementById('content'));
 
 	/* REACT HOT LOADER */ }).call(this); } finally { if (true) { (function () { var foundReactClasses = module.hot.data && module.hot.data.foundReactClasses || false; if (module.exports && module.makeHot) { var makeExportsHot = __webpack_require__(510); if (makeExportsHot(module, __webpack_require__(156))) { foundReactClasses = true; } var shouldAcceptModule = true && foundReactClasses; if (shouldAcceptModule) { module.hot.accept(function (err) { if (err) { console.error("Cannot not apply hot update to " + "YandexMap.js" + ": " + err.message); } }); } } module.hot.dispose(function (data) { data.makeHot = module.makeHot; data.foundReactClasses = foundReactClasses; }); })(); } }
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(4)(module)))

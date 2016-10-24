@@ -1,17 +1,7 @@
 // Импорт компонентов для работы React и Bootstrap
 import React, {Component, PropTypes} from "react";
 import ReactDOM from "react-dom";
-import {
-    Button,
-    Modal,
-    FormGroup,
-    FormControl,
-    ControlLabel,
-    Glyphicon,
-    Row,
-    Collapse,
-    Alert
-} from 'react-bootstrap';
+import {Button, Modal, FormGroup, FormControl, ControlLabel, Row, Collapse, Alert} from 'react-bootstrap';
 
 // Класс для обработки данных и вывода информации на страницу
 class Map extends Component {
@@ -20,15 +10,20 @@ class Map extends Component {
         // Устанавливаем начальные значения переменных
         this.state = {
             // При запуске приложения показываем диалог ввода данных расхода и стоимости топлива
-            showModal: false,
+            showModal: true,
             // Задаем первичные значения расхода и стоимости топлива исходя из передынных props
             fuelConsumption: this.props.fuelConsumptionInitialValue,
             fuelPrice: this.props.fuelPriceInitialValue,
             oldFuelConsumption: this.props.fuelConsumptionInitialValue,
             oldFuelPrice: this.props.fuelPriceInitialValue,
 
+            // Проверка и запись в state параметров карты.
+            // В случае слишком маленьких размеров, устанавливаем минимальные чтобы элементы не заходили друг на друга
+            mapWidth: (this.props.mapWidth > 550) ? this.props.mapWidth : 550,
+            mapHeight: (this.props.mapHeight > 350) ? this.props.mapHeight : 350,
+
             // Переменная для обозначения активности режима редактирования маршурта
-            editMode: false,
+            editMode: true,
 
             // Координаты точек на карте для обозначения адресов до того как маршрут построен
             startPoint: null,
@@ -44,11 +39,16 @@ class Map extends Component {
         this.closeSettings = this.closeSettings.bind(this);
         this.openSettings = this.openSettings.bind(this);
         this.handleSettingsChange = this.handleSettingsChange.bind(this);
+        this.fuelConsumptionValidation = this.fuelConsumptionValidation.bind(this);
+        this.fuelPriceValidation = this.fuelPriceValidation.bind(this);
 
         this.onClick = this.onClick.bind(this);
+        this.buildRoute = this.buildRoute.bind(this);
+        this.addRouteInfo = this.addRouteInfo.bind(this);
         this.createMap = this.createMap.bind(this);
         this.setStartPoint = this.setStartPoint.bind(this);
         this.setFinishPoint = this.setFinishPoint.bind(this);
+        this.swapAddresses = this.swapAddresses.bind(this);
         this.drawMap();
     }
 
@@ -65,9 +65,14 @@ class Map extends Component {
         if (this.fuelConsumptionValidation() == 'success' && this.fuelPriceValidation() == 'success') {
             this.setState({showModal: false});
 
-            if(this.multiRoute) {
-                let routeLength = this.multiRoute.getActiveRoute().properties.get('distance').value / 1000;
+            let routeLength = null;
+
+            if (this.multiRoute) {
+                routeLength = this.multiRoute.getActiveRoute().properties.get('distance').value / 1000;
+            }
+            if (this.myMap) {
                 this.addRouteInfo(routeLength);
+                this.buttonSettings.deselect();
             }
         }
     }
@@ -79,6 +84,7 @@ class Map extends Component {
         this.setState({fuelConsumption: this.state.oldFuelConsumption});
         this.setState({fuelPrice: this.state.oldFuelPrice});
         this.setState({showModal: false});
+        this.buttonSettings.deselect();
     }
 
     /**
@@ -125,10 +131,6 @@ class Map extends Component {
     renderSettings() {
         return (
             <div className="modal-container">
-                <div id="menu" className="pull-right">
-                    <Button bsStyle="primary" onClick={this.openSettings}><Glyphicon glyph="cog"/></Button>
-                </div>
-
                 <Modal show={this.state.showModal} onHide={this.closeSettings}>
                     <Modal.Header closeButton>
                         <Modal.Title>Настройки расхода и стоимости топлива</Modal.Title>
@@ -171,9 +173,6 @@ class Map extends Component {
                         <Button onClick={this.closeSettings} bsStyle="danger">Отменить</Button>
                     </Modal.Footer>
                 </Modal>
-                <div className="col-lg-12">
-                    <hr />
-                </div>
             </div>
         );
     }
@@ -185,19 +184,50 @@ class Map extends Component {
      */
 
     /**
-     * Функция создания карты и добавления в нее элементов управления
+     * Функция определения местоположения пользователя и создания карты
      */
     createMap() {
-        // Создание карты с заданным центром и приближением
-        this.myMap = new ymaps.Map('map', {
-            center: [55.750475, 37.616273],
-            zoom: 9,
-            type: 'yandex#map',
-            controls: []
-        }, {
-            buttonMaxWidth: 300
-        });
+        this.myMap = null;
+        // Получение координат местоположения пользователя
+        ymaps.geolocation.get().then(function (res) {
+            let mapCenterAndZoom = ymaps.util.bounds.getCenterAndZoom(
+                res.geoObjects.get(0).properties.get('boundedBy'),
+                [this.state.mapWidth, this.state.mapHeight]
+            );
 
+            this.myMap = new ymaps.Map('map', {
+                center: mapCenterAndZoom.center,
+                zoom: mapCenterAndZoom.zoom,
+                type: 'yandex#map',
+                controls: []
+            }, {
+                buttonMaxWidth: 300
+            });
+
+            this.addControlsToMap();
+            this.addRouteInfo();
+        }.bind(this), function () {
+            // Если место положение невозможно получить, то просто создаем карту.
+            this.myMap = new ymaps.Map('map', {
+                center: [55.750475, 37.616273],
+                zoom: 9,
+                type: 'yandex#map',
+                controls: []
+            }, {
+                buttonMaxWidth: 300
+            });
+
+            console.log('asdf');
+
+            this.addControlsToMap();
+            this.addRouteInfo();
+        });
+    }
+
+    /**
+     * Добавление элементов управления на карту
+     */
+    addControlsToMap() {
         // Поисковое поле для начала маршрута
         this.searchStartPoint = new ymaps.control.SearchControl({
             options: {
@@ -243,9 +273,7 @@ class Map extends Component {
                 let results = this.searchStartPoint.getResultsArray();
                 let selected = e.get('index');
                 let point = results[selected].geometry.getCoordinates();
-
                 this.setState({startPointCoords: point});
-
                 if (!this.buildRoute()) {
                     this.setStartPoint(point);
                 }
@@ -261,9 +289,7 @@ class Map extends Component {
                 let results = this.searchFinishPoint.getResultsArray();
                 let selected = e.get('index');
                 let point = results[selected].geometry.getCoordinates();
-
                 this.setState({finishPointCoords: point});
-
                 if (!this.buildRoute()) {
                     this.setFinishPoint(point);
                 }
@@ -276,12 +302,25 @@ class Map extends Component {
 
         // Кнопка включения и отключения режима редактирования
         this.buttonEditor = new ymaps.control.Button({
-            data: {content: "Режим редактирования"}
+            data: {content: "Режим редактирования"},
+            options: {
+                float: "right",
+                floatIndex: 0
+            }
         });
 
         // Кнопка смены мест адресов
         this.buttonSwap = new ymaps.control.Button({
             data: {content: "Сменить адреса"}
+        });
+
+        // Кнопка смены мест адресов
+        this.buttonSettings = new ymaps.control.Button({
+            data: {image: "img/cog.png"},
+            options: {
+                float: "right",
+                floatIndex: 1
+            }
         });
 
         // При входе в режим редактирования, делаем видимыми поля поиска и кнопку смена адресов
@@ -290,14 +329,17 @@ class Map extends Component {
             this.buttonSwap.options.set('visible', true);
             this.searchStartPoint.options.set('visible', true);
             this.searchFinishPoint.options.set('visible', true);
+            let routeLength = null;
             this.setState({editMode: true});
             if (this.multiRoute) {
+                routeLength = this.multiRoute.getActiveRoute().properties.get('distance').value / 1000;
                 this.multiRoute.editor.start({
                     addWayPoints: false,
                     dragWayPoints: true,
                     addMidPoints: false,
                 });
             }
+            this.addRouteInfo(routeLength);
         }.bind(this));
 
         // При выходе из режима редактирования прячем элементы редактирования маршрута и скрываем предупреждение
@@ -305,16 +347,24 @@ class Map extends Component {
             this.buttonSwap.options.set('visible', false);
             this.searchStartPoint.options.set('visible', false);
             this.searchFinishPoint.options.set('visible', false);
+            let routeLength = null;
             this.setState({editMode: false});
             // Выключение режима редактирования.
             if (this.multiRoute) {
+                routeLength = this.multiRoute.getActiveRoute().properties.get('distance').value / 1000;
                 this.multiRoute.editor.stop();
             }
+            this.addRouteInfo(routeLength);
         }.bind(this));
 
-        // Событие нажатия кнопки смена адресов
+        // Событие нажатия кнопки смены адресов
         this.buttonSwap.events.add("click", () => {
             this.swapAddresses()
+        });
+
+        // Событие нажатия кнопки вызова настройек расхода и сотимости топлива
+        this.buttonSettings.events.add("click", () => {
+            this.openSettings()
         });
 
         // Создаем элемент для отображения данных по проложенному маршруту:
@@ -365,18 +415,22 @@ class Map extends Component {
 
         this.routeInfo = new RouteInfo();
 
-        this.addRouteInfo();
-
         // Добавляем на карту элементы управления
         this.myMap.controls.add(this.searchStartPoint);
         this.myMap.controls.add(this.searchFinishPoint);
+        this.myMap.controls.add(this.buttonSettings);
         this.myMap.controls.add(this.buttonEditor);
         this.myMap.controls.add(this.buttonSwap);
         this.myMap.events.add('click', this.onClick);
 
         this.buttonEditor.select();
+
+        this.addRouteInfo();
     }
 
+    /**
+     * Добавление информации о маршруте
+     */
     addRouteInfo(routeLength = null) {
         this.myMap.controls.remove(this.routeInfo);
 
@@ -386,7 +440,7 @@ class Map extends Component {
             routeLength: routeLength,
             float: 'none',
             position: {
-                top: 90,
+                top: this.state.editMode ? 90 : 10,
                 left: 10
             }
         });
@@ -414,7 +468,8 @@ class Map extends Component {
                 referencePoints: [this.state.startPointCoords, this.state.finishPointCoords]
             }, {
                 addMidPoints: false,
-                editorDrawOver: false
+                editorDrawOver: false,
+                boundsAutoApply: true
             });
 
             // После создания маршрута сразу включаем режим его редактирования
@@ -613,13 +668,13 @@ class Map extends Component {
      */
     renderMap() {
         return (
-            <div>
+            <div style={{width: this.state.mapWidth + "px"}}>
                 <Collapse in={this.state.editMode}>
                     <Alert className="text-center" bsStyle="warning">
                         <strong>Включен режим редактирования</strong>
                     </Alert>
                 </Collapse>
-                <div id="map" className="col-lg-12"></div>
+                <div id="map" style={{height: this.state.mapHeight + "px"}}></div>
             </div>
         )
     }
@@ -629,7 +684,7 @@ class Map extends Component {
      */
     render() {
         return (
-            <div className="main">
+            <div className="main" style={{marginTop: "10px"}}>
                 {/* Ряд для кнопки настроек топлива в котором создается модальное окно с настройками топлива */}
                 <Row>
                     { this.renderSettings() }
@@ -643,6 +698,7 @@ class Map extends Component {
     }
 }
 
+// Класс информации о маршруте
 class RouteInfo {
     constructor(options) {
         RouteInfo.superclass.constructor.call(this, options);
@@ -656,18 +712,64 @@ class RouteInfo {
  */
 Map.propTypes = {
     fuelConsumptionInitialValue: React.PropTypes.number.isRequired,
-    fuelPriceInitialValue: React.PropTypes.number.isRequired
+    fuelPriceInitialValue: React.PropTypes.number.isRequired,
+    mapHeight: React.PropTypes.number.isRequired,
+    mapWidth: React.PropTypes.number.isRequired,
 };
 
 /**
  * Задаем значения по умолчанию
  */
 Map.defaultProps = {
-    fuelConsumptionInitialValue: 13,
-    fuelPriceInitialValue: 37.35
+    fuelConsumptionInitialValue: 10,
+    fuelPriceInitialValue: 39,
+    mapHeight: 550,
+    mapWidth: 1280,
 };
+
+
+// Класс для примера
+class Example extends Component {
+    constructor(props) {
+        super(props);
+    }
+
+    render() {
+        return (
+            <div>
+                <h1 className="text-center">Расчет маршрута | React + Yandex Map API</h1>
+                <hr/>
+                <Map fuelConsumptionInitialValue={9} fuelPriceInitialValue={38.5} mapHeight={550} mapWidth={1280}/>
+                <hr/>
+                <div>
+                    <h4>Задача:</h4>
+                    <p>Создать веб-приложение, используя api Яндекс карт последней версии. Использовать любой фреймворк
+                        (angular, ember, react, backbone, ... ).</p>
+                    <ul>
+                        <li>Показывается поп-ап с настройками 1 раз при первом запуске приложения, затем настройки можно
+                            вызывать по кнопке открыть настройки. В полях расход на 100 км и цена за литр указать
+                            демо-данные, которые в дальнейшем можно будет редактировать.
+                        </li>
+                        <li>Вводим названия точек А и Б (пунктов), прокладывается путь на карте. Пункты можно менять
+                            местами, так же редактировать, нажав кнопку режим редактирования, при этом показываем
+                            пользователю, что режим редактирования активен. В режиме редактирования можно перетаскивать
+                            сам путь на карте.
+                        </li>
+                        <li>Информация путь и кол-во топлива выводится ниже текстовых полей маршрут</li>
+                    </ul>
+                    <p>Приложение должно уметь правильно рассчитывать путь и количество затрачиваемого топлива для
+                        данного пути.</p>
+                </div>
+            </div>
+        );
+    }
+}
 
 /**
  * Выводим созданный класс на страницу пользователю
  */
-ReactDOM.render(<Map />, document.getElementById('content'));
+
+ReactDOM.render(
+    <Example />,
+    document.getElementById('content')
+);
